@@ -1,0 +1,19 @@
+{
+     "compilerOptions": {
+         "target": "ESNext",
+         "module": "NodeNext",
+         "moduleResolution": "nodenext",
+         "rootDir": ".",
+         "outDir": "./dist",
+         "strictNullChecks": true,
+         "skipLibCheck": false,
+         "noImplicitThis": true,
+         "resolveJsonModule": true,
+         "forceConsistentCasingInFileNames": true,
+         "paths": {
+             "*": ["./node_modules/*"]
+         },
+         "allowSyntheticDefaultImports": true
+     },
+     "include": ["index.mts"]
+ }
