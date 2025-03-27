@@ -38,23 +38,19 @@ It’s ideal for developers who need a lightweight database solution with persis
 ## Installation
 
 ### Prerequisites
-- Node.js 20+ (due to experimental SQLite support)
-- TypeScript (optional but recommended for type safety)
+- Node.js 23+ (SQlite node is stiil on experimental support)
+- TypeScript (Recommended for type safety)
 - Yarn or npm
+- ESM Module is Supported Only
 
 ### Steps
-1. Install the package (assuming it’s published; for now, use the source file):
+1. Install the package:
    ```bash
    yarn add abstract-sqlite-native
-   ```
-   Or, if using the source directly:
-   ```bash
-   cp path/to/database.mts ./model/database.mts
    ```
 
 2. Ensure TypeScript is configured with ES modules (if using TypeScript):
    ```json
-   // tsconfig.json
    {
      "compilerOptions": {
        "module": "ESNext",
@@ -110,7 +106,7 @@ const db = new DatabaseManager('./mydb.sqlite', {
 Create a `DatabaseManager` instance with a file path (persistent) or `':memory:'` (in-memory).
 
 ```typescript
-import { DatabaseManager } from './model/database.mts';
+import { DatabaseManager } from 'abstract-sqlite-native';
 
 const db = new DatabaseManager('./mydb.sqlite');
 ```
@@ -289,6 +285,6 @@ process.on('SIGINT', () => {
 
 This creates a `testdb.sqlite` file, adds users every 5 seconds, and persists data across runs.
 
----
+# Contribution
 
-This documentation provides a comprehensive guide to using **Abstract SQLite Native**. Let me know if you’d like to refine any section or add more details!
+You can get started by **[Forking](https://github.com/AstroX11/sqlite/fork)** and Creating a PR.
