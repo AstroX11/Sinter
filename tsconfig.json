@@ -13,7 +13,9 @@
          "paths": {
              "*": ["./node_modules/*"]
          },
-         "allowSyntheticDefaultImports": true
+         "allowSyntheticDefaultImports": true,
+         "declaration": true,
+         "declarationDir": "./dist"
      },
      "include": ["index.mts"]
  }
