@@ -28,7 +28,7 @@ export const Op = {
 interface ColumnDef {
   type: DataType;
   allowNull?: boolean;
-  defaultValue?: SupportedValueType | (() => SupportedValueType); // Allow functions
+  defaultValue?: SupportedValueType | (() => SupportedValueType);
   primaryKey?: boolean;
   autoIncrement?: boolean;
   unique?: boolean;
@@ -51,7 +51,7 @@ interface Hook {
   afterUpdate?: (instance: Record<string, SupportedValueType>) => void;
 }
 
-class Database {
+export class Database {
   private db: DatabaseSync;
   private schemas: { [key: string]: Schema } = {};
   private models: { [key: string]: Model } = {};
@@ -88,6 +88,20 @@ class Database {
     return model;
   }
 
+  getModel(name: string, attributes?: Record<string, ColumnDef>): Model {
+    if (this.models[name]) {
+      return this.models[name];
+    }
+    if (attributes) {
+      const model = this.define(name, attributes);
+      model.createTable();
+      return model;
+    }
+    const inferredModel = this.define(name, {});
+    this.models[name] = inferredModel;
+    return inferredModel;
+  }
+
   get raw(): DatabaseSync {
     return this.db;
   }
@@ -99,12 +113,6 @@ class Database {
   getSchemas(): { [key: string]: Schema } {
     return this.schemas;
   }
-
-  getModel(name: string): Model {
-    const model = this.models[name];
-    if (!model) throw new Error(`Model ${name} not found`);
-    return model;
-  }
 }
 
 export class Model {
@@ -113,15 +121,17 @@ export class Model {
   private attributes: Record<string, ColumnDef>;
   private associations: Association[] = [];
   private hooks: Hook;
+  private schemaInferred: boolean = false;
 
   constructor(db: Database, name: string, attributes: Record<string, ColumnDef>, hooks: Hook) {
     this.db = db;
     this.name = name;
     this.attributes = attributes;
     this.hooks = hooks;
+    this.schemaInferred = Object.keys(attributes).length === 0;
 
     this.createTable = dbFunctions.createTable.bind(this);
-    this.add = dbFunctions.add.bind(this);
+    this.add = this.add.bind(this);
     this.all = dbFunctions.all.bind(this);
     this.one = dbFunctions.one.bind(this);
     this.update = dbFunctions.update.bind(this);
@@ -134,8 +144,55 @@ export class Model {
     this.findByPk = dbFunctions.findByPk.bind(this);
   }
 
+  add(data: Record<string, SupportedValueType>): Record<string, SupportedValueType> {
+    if (this.schemaInferred) {
+      const tableExists = this.db.raw
+        .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`)
+        .get(this.name);
+      if (!tableExists) {
+        const inferredAttributes: Record<string, ColumnDef> = {
+          id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        };
+        for (const [key, value] of Object.entries(data)) {
+          inferredAttributes[key] = {
+            type: this.inferDataType(value),
+            allowNull: true,
+          };
+        }
+        this.attributes = inferredAttributes;
+        this.createTable();
+      }
+      this.schemaInferred = false;
+    }
+
+    // Handle UNIQUE constraint on name
+    let uniqueData = { ...data };
+    const nameAttr = this.attributes['name'];
+    if (nameAttr?.unique && uniqueData['name']) {
+      let baseName = uniqueData['name'] as string;
+      let suffix = 1;
+      let existing = this.one({ where: { name: baseName } });
+      while (existing) {
+        uniqueData['name'] = `${baseName}-${suffix}`;
+        existing = this.one({ where: { name: uniqueData['name'] } });
+        suffix++;
+      }
+    }
+
+    return dbFunctions.add.call(this, uniqueData);
+  }
+
+  private inferDataType(value: any): DataType {
+    if (typeof value === 'string') return DataTypes.STRING;
+    if (typeof value === 'number')
+      return Number.isInteger(value) ? DataTypes.INTEGER : DataTypes.BIGINT;
+    if (typeof value === 'boolean') return DataTypes.BOOLEAN;
+    if (value instanceof Date) return DataTypes.DATE;
+    if (typeof value === 'object' && value !== null) return DataTypes.JSON;
+    return DataTypes.NULL;
+  }
+
   createTable = dbFunctions.createTable;
-  add = dbFunctions.add;
   all = dbFunctions.all;
   one = dbFunctions.one;
   update = dbFunctions.update;
@@ -206,4 +263,3 @@ export class Transaction {
   }
 }
 export default Database;
-export { Database };
