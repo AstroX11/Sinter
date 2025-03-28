@@ -1,6 +1,6 @@
 {
   "name": "abstract-sqlite-native",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "A Simple library that simplifies the native node:sqlite functionality, providing a user-friendly SQLite interface for database operations.",
   "main": "./dist/src/index.mjs",
   "type": "module",
