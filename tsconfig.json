@@ -15,7 +15,8 @@
          },
          "allowSyntheticDefaultImports": true,
          "declaration": true,
-         "declarationDir": "./dist"
+         "declarationDir": "./dist",
+         "removeComments": true
      },
      "include": ["index.mts"]
  }
