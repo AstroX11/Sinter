@@ -2,7 +2,7 @@
   "name": "abstract-sqlite-native",
   "version": "1.3.0",
   "description": "A Simple library that simplifies the native node:sqlite functionality, providing a user-friendly SQLite interface for database operations.",
-  "main": "./dist/index.js",
+  "main": "./dist/src/index.mjs",
   "type": "module",
   "repository": "https://github.com/AstroX11/sqlite",
   "author": "AstroX11 <danielfx0012@gmail.com>",
@@ -18,7 +18,8 @@
     "node": ">=23"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test": "node test.js"
   },
   "dependencies": {
     "@types/node": "^22.13.14",
