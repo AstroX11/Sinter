@@ -1,16 +1,16 @@
-import type { ModelDefinition } from '../Types.mts';
+import type { ModelDefinition } from '../Types.mjs';
 
 export function addTimestamps(def: ModelDefinition): void {
   if (def?.options?.timestamps) {
     def.attributes.createdAt = {
       type: 'DATE',
       allowNull: false,
-      defaultValue: 'CURRENT_TIMESTAMP',
+      defaultValue: Date.now(),
     };
     def.attributes.updatedAt = {
       type: 'DATE',
       allowNull: false,
-      defaultValue: 'CURRENT_TIMESTAMP',
+      defaultValue: Date.now(),
     };
   }
 }

@@ -96,11 +96,6 @@ export function formatDefaultValue(value: unknown): string {
   if (value === null) return 'NULL';
 
   if (typeof value === 'string') {
-    // Handle special cases
-    if (value === 'CURRENT_TIMESTAMP' || value === 'CURRENT_TIME' || value === 'CURRENT_DATE') {
-      return value;
-    }
-
     // Escape single quotes for string literals
     return `'${value.replace(/'/g, "''")}'`;
   }

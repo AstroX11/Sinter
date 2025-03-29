@@ -6,6 +6,7 @@ import { generateTriggerSQL } from './trigger-generator.js';
 import { addTimestamps, addParanoidField } from './schema-operations.mjs';
 import { createIndexes } from './index-operations.js';
 import { pluralize } from './utils.js';
+import { validateModelAttributes } from './validation.mjs';
 
 export function defineModel(
   db: DatabaseSync,
@@ -36,7 +37,7 @@ function createModelDefinition(
 ): ModelDefinition {
   const tableName = getTableName(modelName, options);
   const modelDef: ModelDefinition = {
-    attributes: { ...attributes },
+    attributes: { ...attributes }, // Safe copy
     options: {
       timestamps: options?.timestamps ?? true,
       paranoid: options?.paranoid ?? false,
@@ -48,7 +49,8 @@ function createModelDefinition(
     },
     tableName,
   };
-
+  
+  validateModelAttributes(modelName, attributes);
   addTimestamps(modelDef);
   addParanoidField(modelDef);
   return modelDef;

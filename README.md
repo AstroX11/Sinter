@@ -17,14 +17,4 @@ npm install abstract-sqlite-native
 yarn add abstract-sqlite-native
 ```
 
-#### Using Edge Version
-
-```bash
-yarn add https://github.com/AstroX11/sqlite
-```
-
-```bash
-npm install https://github.com/AstroX11/sqlite
-```
-
-### `REFER TO TEST.JS FOR USAGES`
+### [`DOCS`](https://github.com/AstroX11/sqlite/wiki)
