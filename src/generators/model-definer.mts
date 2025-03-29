@@ -8,6 +8,18 @@ import { createIndexes } from './index-operations.js';
 import { pluralize } from './utils.js';
 import { validateModelAttributes } from './validation.mjs';
 import { createModelCreateMethod } from '../models/create.js';
+import { createFindOrCreateMethod } from '../models/findOrCreate.js';
+import { createFindByPkMethod } from '../models/findByPk.js';
+import { createFindOneMethod } from '../models/findOne.js';
+import { createFindAllMethod } from '../models/findAll.js';
+import { createMathMethods } from '../models/maths.js';
+import { createIncrementDecrementMethods } from '../models/++--.js';
+import { createBulkCreateMethod } from '../models/bulkCreate.js';
+import { createUpdateMethod } from '../models/update.js';
+import { createDestroyMethod } from '../models/destroy.js';
+import { createTruncateMethod } from '../models/truncate.js';
+import { createRestoreMethod } from '../models/restore.js';
+import { createUpsertMethod } from '../models/upsert.js';
 
 export function defineModel(
   db: DatabaseSync,
@@ -20,18 +32,35 @@ export function defineModel(
 
   try {
     db.exec(generateCreateTableSQL(modelDefinition));
-    const model = {
+    const execs = {
       definition: modelDefinition,
       create: createModelCreateMethod(db, modelDefinition),
+      findOrCreate: createFindOrCreateMethod(db, modelDefinition),
+      findByPk: createFindByPkMethod(db, modelDefinition),
+      findOne: createFindOneMethod(db, modelDefinition),
+      findAll: createFindAllMethod(db, modelDefinition),
+      findAndCountAll: createFindAllMethod(db, modelDefinition),
+      count: createMathMethods(db, modelDefinition).count,
+      max: createMathMethods(db, modelDefinition).max,
+      min: createMathMethods(db, modelDefinition).min,
+      sum: createMathMethods(db, modelDefinition).sum,
+      increment: createIncrementDecrementMethods(db, modelDefinition).increment,
+      decrement: createIncrementDecrementMethods(db, modelDefinition).decrement,
+      bulkCreate: createBulkCreateMethod(db, modelDefinition),
+      update: createUpdateMethod(db, modelDefinition),
+      destroy: createDestroyMethod(db, modelDefinition),
+      truncate: createTruncateMethod(db, modelDefinition),
+      // restore: createRestoreMethod(db, modelDefinition),
+      upsert: createUpsertMethod(db, modelDefinition),
     };
 
-    models.set(modelName, model);
+    models.set(modelName, execs);
 
     createIndexes(db, modelDefinition);
     const triggerSQLs = generateTriggerSQL(modelDefinition);
     triggerSQLs.forEach((sql) => db.exec(sql));
 
-    return model;
+    return execs;
   } catch (error) {
     handleDefineError(error, modelName, modelDefinition);
     throw error;
