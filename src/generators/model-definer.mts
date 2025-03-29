@@ -7,26 +7,34 @@ import { addTimestamps, addParanoidField } from './schema-operations.mjs';
 import { createIndexes } from './index-operations.js';
 import { pluralize } from './utils.js';
 import { validateModelAttributes } from './validation.mjs';
+import { createModelCreateMethod } from '../models/create.js';
 
 export function defineModel(
   db: DatabaseSync,
-  models: Map<string, ModelDefinition>,
+  models: Map<string, any>,
   modelName: string,
   attributes: ModelAttributes,
   options: DefineModelOptions,
-): void {
+) {
   const modelDefinition = createModelDefinition(modelName, attributes, options);
 
   try {
     db.exec(generateCreateTableSQL(modelDefinition));
-    models.set(modelName, modelDefinition);
+    const model = {
+      definition: modelDefinition,
+      create: createModelCreateMethod(db, modelDefinition),
+    };
+
+    models.set(modelName, model);
 
     createIndexes(db, modelDefinition);
-
     const triggerSQLs = generateTriggerSQL(modelDefinition);
     triggerSQLs.forEach((sql) => db.exec(sql));
+
+    return model;
   } catch (error) {
     handleDefineError(error, modelName, modelDefinition);
+    throw error;
   }
 }
 
@@ -49,7 +57,7 @@ function createModelDefinition(
     },
     tableName,
   };
-  
+
   validateModelAttributes(modelName, attributes);
   addTimestamps(modelDef);
   addParanoidField(modelDef);
@@ -57,7 +65,10 @@ function createModelDefinition(
 }
 
 function getTableName(modelName: string, options: DefineModelOptions): string {
-  return options?.freezeTableName ? modelName : options?.tableName || pluralize(modelName);
+  if (options?.tableName) {
+    return options?.freezeTableName ? options.tableName : pluralize(options.tableName);
+  }
+  return options?.freezeTableName ? modelName : pluralize(modelName);
 }
 
 function handleDefineError(error: unknown, modelName: string, def: ModelDefinition): unknown {

@@ -1,14 +1,13 @@
-import { Database } from './dist/src/index.mjs';
+import Database from './dist/src/index.mjs';
 
-const db = new Database('test.db', {});
+const db = new Database('test.db', { enableForeignKeyConstraints: true });
 
-db.define('User', {
-    email: {
-      type: 'STRING',
-      allowNull: false,
-      validate: {
-        isEmail: { msg: 'Must be a valid email address' },
-      },
-      defaultValue: 'm@d.g.com' // This will trigger validation error
-    }
-  });
+const users = db.define(
+  'User',
+  {
+    username: { type: 'string', unique: true, allowNull: false },
+    email: { type: 'string', unique: true, allowNull: false, validate: { isEmail: true } },
+    password: { type: 'string', allowNull: false },
+  },
+  { freezeTableName: true, tableName: 'astro' },
+);
