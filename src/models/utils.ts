@@ -1,6 +1,6 @@
-import { DataType } from '../Types.mjs';
+import { DataTypesValues } from '../index.mjs';
 
-export function convertToSqliteValue(value: any, type: string | DataType): any {
+export function convertToSqliteValue(value: any, type: string | DataTypesValues): any {
   if (value === null || value === undefined) return null;
   if (value instanceof Date) return value.toISOString();
   if (typeof value === 'boolean') return value ? 1 : 0;

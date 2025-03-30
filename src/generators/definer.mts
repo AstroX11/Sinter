@@ -1,12 +1,16 @@
 import type { DatabaseSync } from 'node:sqlite';
-import type { ModelDefinition, DefineModelOptions, ModelAttributes } from '../Types.mjs';
-import { generateCreateTableSQL } from './table-generator.js';
-import { isSQLiteError } from '../Types.mjs';
-import { generateTriggerSQL } from './trigger-generator.js';
-import { addTimestamps, addParanoidField } from './schema-operations.mjs';
-import { createIndexes } from './index-operations.js';
+import type {
+  ModelDefinition,
+  DefineModelOptions,
+  ModelAttributes,
+  ModelExports as Models,
+} from '../Types.mjs';
 import { pluralize } from './utils.js';
-import { validateModelAttributes } from './validation.mjs';
+import { addTimestamps, addParanoidField, validateModelAttributes } from './schema.mjs';
+import { generateCreateTableSQL } from './tables.js';
+import { isSQLiteError } from '../Types.mjs';
+import { generateTriggerSQL } from './triggers.js';
+import { createIndexes } from './operations.js';
 import { createModelCreateMethod } from '../models/create.js';
 import { createFindOrCreateMethod } from '../models/findOrCreate.js';
 import { createFindByPkMethod } from '../models/findByPk.js';
@@ -27,7 +31,7 @@ export function defineModel(
   modelName: string,
   attributes: ModelAttributes,
   options: DefineModelOptions,
-) {
+): Models {
   const modelDefinition = createModelDefinition(modelName, attributes, options);
 
   try {

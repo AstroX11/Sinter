@@ -1,14 +1,17 @@
-import Database, { DATATYPE } from './dist/src/index.mjs';
+import Database from './dist/src/index.mjs';
 
-const db = new Database('test.db', { enableForeignKeyConstraints: true });
+const db = new Database('test.db', {});
 
-const Antilink = db.define(
-  'Antilink',
+const Users = db.define(
+  'Users',
   {
-    jid: { type: DATATYPE.STRING, allowNull: false },
-    status: { type: DATATYPE.BOOLEAN, allowNull: true, defaultValue: 0 },
+    id: { type: 'STRING', allowNull: false, primaryKey: true },
+    username: { type: 'STRING', allowNull: false, unique: true },
   },
-  { freezeTableName: true, timestamps: false },
+  { freezeTableName: true },
 );
 
-const result = Antilink.findByPk(1)
+Users.create({
+  id: '1',
+  username: 'testuser'
+})

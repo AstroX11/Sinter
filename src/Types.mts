@@ -1,5 +1,41 @@
 // types.ts
 import type { DatabaseSyncOptions } from 'node:sqlite';
+import { DataTypesValues } from './index.mjs';
+import { createModelCreateMethod } from './models/create.js';
+import { createFindOrCreateMethod } from './models/findOrCreate.js';
+import { createFindByPkMethod } from './models/findByPk.js';
+import { createFindOneMethod } from './models/findOne.js';
+import { createFindAllMethod } from './models/findAll.js';
+import { createMathMethods } from './models/maths.js';
+import { createIncrementDecrementMethods } from './models/++--.js';
+import { createBulkCreateMethod } from './models/bulkCreate.js';
+import { createUpdateMethod } from './models/update.js';
+import { createDestroyMethod } from './models/destroy.js';
+import { createTruncateMethod } from './models/truncate.js';
+import { createRestoreMethod } from './models/restore.js';
+import { createUpsertMethod } from './models/upsert.js';
+
+export interface ModelExports {
+  definition: ModelDefinition;
+  create: ReturnType<typeof createModelCreateMethod>;
+  findOrCreate: ReturnType<typeof createFindOrCreateMethod>;
+  findByPk: ReturnType<typeof createFindByPkMethod>;
+  findOne: ReturnType<typeof createFindOneMethod>;
+  findAll: ReturnType<typeof createFindAllMethod>;
+  findAndCountAll: ReturnType<typeof createFindAllMethod>;
+  count: ReturnType<typeof createMathMethods>['count'];
+  max: ReturnType<typeof createMathMethods>['max'];
+  min: ReturnType<typeof createMathMethods>['min'];
+  sum: ReturnType<typeof createMathMethods>['sum'];
+  increment: ReturnType<typeof createIncrementDecrementMethods>['increment'];
+  decrement: ReturnType<typeof createIncrementDecrementMethods>['decrement'];
+  bulkCreate: ReturnType<typeof createBulkCreateMethod>;
+  update: ReturnType<typeof createUpdateMethod>;
+  destroy: ReturnType<typeof createDestroyMethod>;
+  truncate: ReturnType<typeof createTruncateMethod>;
+  restore: ReturnType<typeof createRestoreMethod>;
+  upsert: ReturnType<typeof createUpsertMethod>;
+}
 
 /**
  * Definition of a database model
@@ -38,7 +74,7 @@ export interface ColumnDefinition {
   /**
    * Data type of the column
    */
-  type: string | DataType;
+  type: DataTypesValues;
 
   /**
    * Whether this column is a primary key
@@ -71,6 +107,10 @@ export interface ColumnDefinition {
   references?: {
     table: string;
     column: string;
+    model: string;
+    key: string;
+    onUpdate?: 'CASCADE' | 'RESTRICT' | 'SET NULL';
+    onDelete?: 'CASCADE' | 'RESTRICT' | 'SET NULL';
   };
 
   /**
@@ -119,39 +159,25 @@ export interface ColumnDefinition {
   /**
    * Validation rules
    */
-  validate?: {
-    isEmail?: boolean | { msg: string };
-    isUrl?: boolean | { msg: string };
-    isIP?: boolean | { msg: string };
-    isAlpha?: boolean | { msg: string };
-    isAlphanumeric?: boolean | { msg: string };
-    isNumeric?: boolean | { msg: string };
-    isInt?: boolean | { msg: string };
-    isFloat?: boolean | { msg: string };
-    len?: [number, number] | { msg: string };
-    notIn?: unknown[] | { args: unknown[]; msg: string };
-    isIn?: unknown[] | { args: unknown[]; msg: string };
-  };
-}
+  validate?:
+    | {
+        isEmail?: boolean | { msg: string };
+        isUrl?: boolean | { msg: string };
+        isIP?: boolean | { msg: string };
+        isAlpha?: boolean | { msg: string };
+        isAlphanumeric?: boolean | { msg: string };
+        isNumeric?: boolean | { msg: string };
+        isInt?: boolean | { msg: string };
+        isFloat?: boolean | { msg: string };
+        len?: [number, number] | { msg: string };
+        notIn?: unknown[] | { args: unknown[]; msg: string };
+        isIn?: unknown[] | { args: unknown[]; msg: string };
+      }
+    | ValidationRule[];
 
-/**
- * Definition of a data type
- */
-export interface DataType {
-  /**
-   * String representation of the type
-   */
-  toString(): string;
-
-  /**
-   * SQL representation of the type
-   */
-  toSql(): string;
-
-  /**
-   * Type key
-   */
-  key: string;
+  transform?: (value: any) => any;
+  get?: () => any;
+  set?: (value: any) => void;
 }
 
 /**
@@ -252,6 +278,8 @@ export interface DefineModelOptions {
       }
     >;
   };
+  hooks?: ModelHooks;
+  scopes?: Record<string, (criteria?: any) => any>;
 }
 
 /**
@@ -331,6 +359,53 @@ export interface TriggerDefinition {
    */
   ifNotExists?: boolean;
 }
+
+export type ValidationRule = {
+  type: 'min' | 'max' | 'length' | 'pattern' | 'enum' | 'custom';
+  value: any;
+  message?: string;
+};
+
+export type QueryOptions = {
+  where?: Record<string, any>;
+  limit?: number;
+  offset?: number;
+  order?: [string, 'ASC' | 'DESC'][];
+  include?: string[];
+  attributes?: string[];
+  paranoid?: boolean;
+  raw?: boolean;
+  transaction?: string;
+};
+
+export type TransactionOptions = {
+  isolationLevel?: 'DEFERRED' | 'IMMEDIATE' | 'EXCLUSIVE';
+  timeout?: number;
+  readOnly?: boolean;
+};
+
+export type HookFunction = (data: any) => Promise<void> | void;
+
+export type ModelHooks = {
+  beforeValidate?: HookFunction[];
+  afterValidate?: HookFunction[];
+  beforeCreate?: HookFunction[];
+  afterCreate?: HookFunction[];
+  beforeUpdate?: HookFunction[];
+  afterUpdate?: HookFunction[];
+  beforeSave?: HookFunction[];
+  afterSave?: HookFunction[];
+  beforeDelete?: HookFunction[];
+  afterDelete?: HookFunction[];
+  beforeRestore?: HookFunction[];
+  afterRestore?: HookFunction[];
+  onError?: HookFunction[];
+};
+
+export type ValidationResult = {
+  valid: boolean;
+  errors: string[];
+};
 
 /**
  * SQLite-specific error
