@@ -1,35 +1,55 @@
 // models/findOne.ts
 import type { DatabaseSync } from 'node:sqlite';
 import type { ModelDefinition } from '../Types.mjs';
+import { safeGet, convertValueForSQLite } from '../utils/queryHelpers.js';
 
 export function createFindOneMethod(db: DatabaseSync, modelDefinition: ModelDefinition) {
   const { tableName } = modelDefinition;
 
-  /**
-   * Finds a single record matching the criteria
-   * @param options.where The search criteria
-   * @param options.order The sort order
-   * @returns The first matching record or undefined
-   */
-  return function findOne(options: {
-    where?: Record<string, any>;
-    order?: [string, 'ASC' | 'DESC'][];
-  } = {}) {
+  return function findOne(
+    options: {
+      where?: Record<string, any>;
+      order?: [string, 'ASC' | 'DESC'][];
+    } = {},
+  ) {
     let sql = `SELECT * FROM ${tableName}`;
     const values: any[] = [];
 
-    if (options.where) {
+    if (options?.where) {
       const whereClauses = Object.keys(options.where)
-        .map(key => `${key} = ?`);
-      sql += ` WHERE ${whereClauses.join(' AND ')}`;
-      values.push(...Object.values(options.where));
+        .filter((key) => options.where?.[key] !== undefined)
+        .map((key) => {
+          const value = convertValueForSQLite(safeGet(options.where, key));
+          if (value === null) {
+            return `${key} IS NULL`;
+          }
+          values.push(value);
+          return `${key} = ?`;
+        });
+
+      if (whereClauses.length > 0) {
+        sql += ` WHERE ${whereClauses.join(' AND ')}`;
+      }
     }
 
-    if (options.order) {
-      sql += ` ORDER BY ${options.order.map(([col, dir]) => `${col} ${dir}`).join(', ')}`;
+    if (options?.order) {
+      const orderClauses = options.order
+        .filter(([col]) => col)
+        .map(([col, dir]) => `${col} ${dir === 'DESC' ? 'DESC' : 'ASC'}`);
+
+      if (orderClauses.length > 0) {
+        sql += ` ORDER BY ${orderClauses.join(', ')}`;
+      }
     }
 
     sql += ' LIMIT 1';
-    return db.prepare(sql).get(...values);
+
+    try {
+      const stmt = db.prepare(sql);
+      return values.length > 0 ? stmt.get(...values) : stmt.get();
+    } catch (error) {
+      console.error(`Error executing findOne query: ${sql}`, values);
+      throw error;
+    }
   };
 }

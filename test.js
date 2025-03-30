@@ -1,18 +1,23 @@
-import Database from './dist/src/index.mjs';
-import crypto from 'node:crypto'
+import Database, { DATATYPE } from './dist/src/index.mjs';
+import crypto from 'node:crypto';
 
 const db = new Database('test.db', { enableForeignKeyConstraints: true });
 
-const users = db.define(
-  'User',
+const Antilink = db.define(
+  'Antilink',
   {
-    username: { type: 'string', unique: true, allowNull: false, primaryKey: true },
-    email: { type: 'string', unique: true, allowNull: false, validate: { isEmail: true } },
-    password: { type: 'string', allowNull: false },
+    jid: { type: DATATYPE.STRING, allowNull: false },
+    status: { type: DATATYPE.BOOLEAN, allowNull: true, defaultValue: 0 },
   },
-  { freezeTableName: true, tableName: 'astro' },
+  { freezeTableName: true, timestamps: false },
 );
 
+// Now this will work correctly with multiple parameters
+const result = Antilink.findAndCountAll({
+  where: {
+    jid: '123@whatsapp.net',
+    status: true,
+  },
+});
 
-
-console.log(await users.truncate())
+console.log(result);

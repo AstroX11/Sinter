@@ -50,7 +50,7 @@ export function defineModel(
       update: createUpdateMethod(db, modelDefinition),
       destroy: createDestroyMethod(db, modelDefinition),
       truncate: createTruncateMethod(db, modelDefinition),
-      // restore: createRestoreMethod(db, modelDefinition),
+      restore: createRestoreMethod(db, modelDefinition),
       upsert: createUpsertMethod(db, modelDefinition),
     };
 
