@@ -10,11 +10,11 @@ A lightweight ORM for SQLite using Node.js's native `node:sqlite` module. Provid
 #### Installation
 
 ```bash
-npm install abstract-sqlite-native
+npm install @astrox/sqlite
 ```
 
 ```bash
-yarn add abstract-sqlite-native
+yarn add @astrox11/sqlite
 ```
 
 ### [`DOCS`](https://github.com/AstroX11/sqlite/wiki)
