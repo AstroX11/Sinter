@@ -19,7 +19,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "node test.js"
+    "test": "node --no-warnings test.js"
   },
   "dependencies": {
     "@types/node": "^22.13.14",

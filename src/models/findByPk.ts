@@ -14,7 +14,11 @@ export function createFindByPkMethod(db: DatabaseSync, modelDefinition: ModelDef
   // Find the primary key column name
   const pkColumn = Object.entries(attributes).find(
     ([_, def]) => def.primaryKey
-  )?.[0] || 'id';
+  )?.[0];
+
+  if (!pkColumn) {
+    throw new Error(`No primary key found for table ${tableName}`);
+  }
 
   /**
    * Finds a record by its primary key

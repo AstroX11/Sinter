@@ -108,9 +108,5 @@ function handleDefineError(error: unknown, modelName: string, def: ModelDefiniti
   ) {
     return;
   }
-  throw new Error(
-    `Failed to define model ${modelName}: ${
-      error instanceof Error ? error.message : String(error)
-    }`,
-  );
+  throw new Error(`Model Error: ${modelName}: ${error as Error}`);
 }
