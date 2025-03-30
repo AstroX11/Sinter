@@ -1,5 +1,5 @@
 {
-  "name": "sqlite",
+  "name": "@astrox11/sqlite",
   "version": "1.0.0",
   "description": "A simple ORM for node:sqlite",
   "main": "./dist/src/index.mjs",
@@ -24,5 +24,8 @@
   "dependencies": {
     "@types/node": "^22.13.14",
     "typescript": "^5.8.2"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
