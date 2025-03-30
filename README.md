@@ -1,8 +1,8 @@
-## `native Abstract SQlite`
+## `Sqlite Native`
 
-A lightweight, optimized ORM for SQLite, built on Node.js's native `node:sqlite` module. This library provides structured database interaction through a declarative model API inspired by Sequelize, but with significantly simpler implementation and maintenance overhead. It preserves SQLite's performance characteristics while adding strong typing, easy query building, and just enough abstraction to eliminate common boilerplate. It offers full schema definitions through all CRUD operations.
+A lightweight ORM for SQLite using Node.js's native `node:sqlite` module. Provides typed database operations with simple query building and schema definitions, inspired by Sequelize but optimized for SQLite performance.
 
-### `Geting Started`
+### `Getting Started`
 
 > [!Important]
 > This library requires [Node.js v23](https://nodejs.org/en/blog/release/v23.10.0) or later. Older versions (including Node.js 20 LTS) are not supported due to dependencies on the experimental `node:sqlite` module.
@@ -18,3 +18,9 @@ yarn add abstract-sqlite-native
 ```
 
 ### [`DOCS`](https://github.com/AstroX11/sqlite/wiki)
+
+### Contributing
+
+Your contributions help keep this project alive and growing. We appreciate any form of contribution, from bug reports to feature improvements.
+
+Feel free to check our issues page or submit your ideas. Thanks for making this project better!

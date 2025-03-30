@@ -1,7 +1,7 @@
 {
-  "name": "abstract-sqlite-native",
-  "version": "2.5.0",
-  "description": "A Simple library that simplifies the native node:sqlite functionality, providing a user-friendly SQLite interface for database operations.",
+  "name": "sqlite",
+  "version": "1.0.0",
+  "description": "A simple ORM for node:sqlite",
   "main": "./dist/src/index.mjs",
   "type": "module",
   "repository": "https://github.com/AstroX11/sqlite",
