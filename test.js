@@ -11,7 +11,4 @@ const Users = db.define(
   { freezeTableName: true },
 );
 
-Users.create({
-  id: '1',
-  username: 'testuser'
-})
+console.log(Users.findOne({t}));
