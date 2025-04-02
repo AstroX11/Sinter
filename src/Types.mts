@@ -416,6 +416,68 @@ export interface SQLiteError extends Error {
   errstr: string;
 }
 
+export type MergeStrategy =
+  | 'replace'
+  | 'preserve'
+  | 'append'
+  | 'numeric'
+  | ((current: any, incoming: any) => any);
+
+export interface UpsertOptions {
+  conflictTarget?: string | string[];
+  updateExclude?: string[];
+  updateOnly?: string[];
+  mergeStrategy?: MergeStrategy;
+  where?: Record<string, any>;
+  returning?: string | string[];
+  beforeUpsert?: (
+    values: Record<string, any>,
+  ) => Promise<Record<string, any>> | Record<string, any>;
+  afterUpsert?: (result: {
+    id: number | bigint;
+    values: Record<string, any>;
+    isNew: boolean;
+  }) => Promise<void> | void;
+  dryRun?: boolean;
+  bulk?: boolean;
+  timeout?: number;
+  onError?: 'abort' | 'ignore' | 'retry';
+  retryOptions?: { attempts: number; backoff: 'fixed' | 'exponential'; delay: number };
+  transaction?: 'required' | 'new' | 'none';
+  batchSize?: number;
+  validate?: (values: Record<string, any>) => Promise<boolean> | boolean;
+}
+
+export interface UpdateOptions {
+  where?: Record<string, any>;
+  returning?: string[] | boolean;
+  limit?: number;
+  transaction?: 'required' | 'new' | 'none';
+  timeout?: number;
+  onError?: 'abort' | 'ignore' | 'retry';
+  retryOptions?: { attempts: number; backoff: 'fixed' | 'exponential'; delay: number };
+  dryRun?: boolean;
+  validate?: (values: Record<string, any>) => Promise<boolean> | boolean;
+  beforeUpdate?: (values: Record<string, any>) => Promise<Record<string, any>> | Record<string, any>;
+  afterUpdate?: (result: { changes: number; updatedRecords: any[] }) => Promise<void> | void;
+  upsert?: {
+    onConflict: string | string[];
+    conflictValues: Record<string, any>;
+    mergeStrategy?: 'replace' | 'preserve' | 'append' | 'numeric' | ((current: any, incoming: any) => any);
+  };
+  orderBy?: [string, 'ASC' | 'DESC'][];
+  batchSize?: number;
+}
+
+export interface BulkCreateOptions {
+  transaction?: boolean;
+  returnRecords?: boolean;
+  ignoreDuplicates?: boolean;
+  updateOnConflict?: boolean;
+  batchSize?: number;
+}
+
+
 /**
  * Type guard for SQLite errors
  */

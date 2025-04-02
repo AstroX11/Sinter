@@ -1,268 +1,337 @@
 import type { DatabaseSync } from 'node:sqlite';
-import type { ModelDefinition } from '../Types.mjs';
 import { convertValueForSQLite } from '../utils/queryHelpers.js';
+import { UpdateOptions } from '../Types.mjs';
 
-export function createUpdateMethod(db: DatabaseSync, modelDefinition: ModelDefinition) {
-  const { tableName, options: opt } = modelDefinition;
-
-  return async function update(
-    values: Record<string, any>,
-    options: {
-      where: Record<string, any>;
-      returning?: string[] | boolean;
-      limit?: number;
-      transaction?: DatabaseSync;
-      ignoreChanges?: boolean;
-      upsert?: {
-        onConflict: string | string[];
-        conflictValues: Record<string, any>;
-      };
-    } = { where: {} },
-  ): Promise<{ changes: number; returning?: any[] }> {
-    if (!options?.where && !options?.upsert) {
-      throw new Error('Where clause or upsert configuration is required for update');
+export function createUpdateMethod(
+  db: DatabaseSync,
+  {
+    tableName,
+    options: modelOptions,
+    attributes,
+  }: { tableName: string; options?: any; attributes: Record<string, any> },
+) {
+  const executeWithRetry = async <T>(
+    fn: () => Promise<T>,
+    options: UpdateOptions,
+    attempt = 1,
+  ): Promise<T> => {
+    try {
+      return await fn();
+    } catch (error) {
+      if (
+        options.onError !== 'retry' ||
+        !options.retryOptions ||
+        attempt >= options.retryOptions.attempts
+      ) {
+        if (options.onError === 'ignore') return { changes: 0 } as T;
+        throw error;
+      }
+      const delay =
+        options.retryOptions.backoff === 'exponential'
+          ? options.retryOptions.delay * 2 ** (attempt - 1)
+          : options.retryOptions.delay;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return executeWithRetry(fn, options, attempt + 1);
     }
+  };
 
-    // Handle automatic timestamp updates if enabled
-    const updateValues = { ...values };
-    if (opt?.timestamps) {
-      updateValues.updatedAt = new Date();
-    }
+  const executeWithTimeout = <T>(fn: () => Promise<T>, timeout?: number): Promise<T> =>
+    timeout && timeout > 0
+      ? Promise.race<T>([
+          fn(),
+          new Promise<T>((_, reject) =>
+            setTimeout(() => reject(new Error(`Timed out after ${timeout}ms`)), timeout),
+          ),
+        ])
+      : fn();
 
-    // SET clause
-    const setClauses = Object.keys(updateValues)
-      .filter((key) => updateValues[key] !== undefined)
-      .map((key) => `${key} = ?`);
+  const processValues = async (values: Record<string, any>, options: UpdateOptions) => {
+    let processed = modelOptions?.timestamps ? { ...values, updatedAt: new Date() } : { ...values };
+    processed = options.beforeUpdate ? await options.beforeUpdate(processed) : processed;
+    if (options.validate && !(await options.validate(processed)))
+      throw new Error('Validation failed');
+    return Object.fromEntries(
+      Object.entries(processed)
+        .filter(([key]) => attributes[key])
+        .map(([key, value]) => {
+          if (key === 'updatedAt' && value instanceof Date) {
+            // Convert Date to Unix timestamp (milliseconds) for INTEGER columns
+            return [key, value.getTime()];
+          }
+          return [key, convertValueForSQLite(value)];
+        }),
+    );
+  };
 
-    if (setClauses.length === 0) {
-      throw new Error('No valid values provided for update');
-    }
+  const buildWhereClause = (where: Record<string, any> = {}) => {
+    const conditions: string[] = [];
+    const values: any[] = [];
 
-    // WHERE clause with support for operators
-    const whereConditions: string[] = [];
-    const whereValues: any[] = [];
-
-    for (const [key, condition] of Object.entries(options.where || {})) {
-      if (condition === undefined) continue;
-
-      if (typeof condition === 'object' && condition !== null) {
-        // Handle operator syntax (e.g., { gt: 5 })
+    for (const [key, condition] of Object.entries(where)) {
+      if (!attributes[key]) continue;
+      if (condition && typeof condition === 'object' && !Array.isArray(condition)) {
         for (const [op, value] of Object.entries(condition)) {
           const sqlValue = convertValueForSQLite(value);
-
           switch (op) {
             case 'eq':
-              whereConditions.push(`${key} = ?`);
-              whereValues.push(sqlValue);
+              conditions.push(`${key} = ?`);
+              values.push(sqlValue);
               break;
             case 'ne':
-              whereConditions.push(`${key} != ?`);
-              whereValues.push(sqlValue);
+              conditions.push(`${key} != ?`);
+              values.push(sqlValue);
               break;
             case 'gt':
-              whereConditions.push(`${key} > ?`);
-              whereValues.push(sqlValue);
+              conditions.push(`${key} > ?`);
+              values.push(sqlValue);
               break;
             case 'gte':
-              whereConditions.push(`${key} >= ?`);
-              whereValues.push(sqlValue);
+              conditions.push(`${key} >= ?`);
+              values.push(sqlValue);
               break;
             case 'lt':
-              whereConditions.push(`${key} < ?`);
-              whereValues.push(sqlValue);
+              conditions.push(`${key} < ?`);
+              values.push(sqlValue);
               break;
             case 'lte':
-              whereConditions.push(`${key} <= ?`);
-              whereValues.push(sqlValue);
+              conditions.push(`${key} <= ?`);
+              values.push(sqlValue);
               break;
             case 'in':
-              if (Array.isArray(value)) {
-                const placeholders = value.map(() => '?').join(', ');
-                whereConditions.push(`${key} IN (${placeholders})`);
-                whereValues.push(...value.map((v) => convertValueForSQLite(v)));
-              } else {
-                whereConditions.push(`${key} IN (?)`);
-                whereValues.push(sqlValue);
-              }
+              conditions.push(
+                `${key} IN (${Array.isArray(value) ? value.map(() => '?').join(', ') : '?'})`,
+              );
+              values.push(
+                ...(Array.isArray(value) ? value.map(convertValueForSQLite) : [sqlValue]),
+              );
               break;
             case 'notIn':
-              if (Array.isArray(value)) {
-                const placeholders = value.map(() => '?').join(', ');
-                whereConditions.push(`${key} NOT IN (${placeholders})`);
-                whereValues.push(...value.map((v) => convertValueForSQLite(v)));
-              } else {
-                whereConditions.push(`${key} NOT IN (?)`);
-                whereValues.push(sqlValue);
-              }
+              conditions.push(
+                `${key} NOT IN (${Array.isArray(value) ? value.map(() => '?').join(', ') : '?'})`,
+              );
+              values.push(
+                ...(Array.isArray(value) ? value.map(convertValueForSQLite) : [sqlValue]),
+              );
               break;
             case 'like':
-              whereConditions.push(`${key} LIKE ?`);
-              whereValues.push(sqlValue);
+              conditions.push(`${key} LIKE ?`);
+              values.push(sqlValue);
               break;
             case 'notLike':
-              whereConditions.push(`${key} NOT LIKE ?`);
-              whereValues.push(sqlValue);
+              conditions.push(`${key} NOT LIKE ?`);
+              values.push(sqlValue);
               break;
             case 'between':
               if (Array.isArray(value) && value.length === 2) {
-                whereConditions.push(`${key} BETWEEN ? AND ?`);
-                whereValues.push(convertValueForSQLite(value[0]), convertValueForSQLite(value[1]));
-              } else {
-                throw new Error('BETWEEN operator requires an array with exactly 2 values');
+                conditions.push(`${key} BETWEEN ? AND ?`);
+                values.push(convertValueForSQLite(value[0]), convertValueForSQLite(value[1]));
               }
               break;
             case 'notBetween':
               if (Array.isArray(value) && value.length === 2) {
-                whereConditions.push(`${key} NOT BETWEEN ? AND ?`);
-                whereValues.push(convertValueForSQLite(value[0]), convertValueForSQLite(value[1]));
-              } else {
-                throw new Error('NOT BETWEEN operator requires an array with exactly 2 values');
+                conditions.push(`${key} NOT BETWEEN ? AND ?`);
+                values.push(convertValueForSQLite(value[0]), convertValueForSQLite(value[1]));
               }
               break;
             case 'null':
-              whereConditions.push(`${key} IS ${value ? '' : 'NOT '}NULL`);
+              conditions.push(`${key} IS ${value ? '' : 'NOT '}NULL`);
               break;
             case 'regex':
-              whereConditions.push(`${key} REGEXP ?`);
-              whereValues.push(sqlValue);
+              conditions.push(`${key} REGEXP ?`);
+              values.push(sqlValue);
               break;
             case 'raw':
-              whereConditions.push(String(value));
+              conditions.push(String(value));
               break;
-            default:
-              throw new Error(`Unsupported operator: ${op}`);
           }
         }
       } else {
-        // Simple equality
         const sqlValue = convertValueForSQLite(condition);
-        if (sqlValue === null) {
-          whereConditions.push(`${key} IS NULL`);
-        } else if (sqlValue === undefined) {
-          whereConditions.push(`${key} IS NULL`);
-        } else if (Array.isArray(sqlValue)) {
-          const placeholders = sqlValue.map(() => '?').join(', ');
-          whereConditions.push(`${key} IN (${placeholders})`);
-          whereValues.push(...sqlValue);
-        } else if (typeof sqlValue === 'boolean') {
-          whereConditions.push(`${key} = ?`);
-          whereValues.push(sqlValue ? 1 : 0);
-        } else if (sqlValue instanceof Date) {
-          whereConditions.push(`${key} = ?`);
-          whereValues.push(sqlValue.toISOString());
-        } else if (typeof sqlValue === 'object') {
-          whereConditions.push(`${key} = ?`);
-          whereValues.push(JSON.stringify(sqlValue));
+        if (sqlValue == null) conditions.push(`${key} IS NULL`);
+        else if (Array.isArray(sqlValue)) {
+          conditions.push(`${key} IN (${sqlValue.map(() => '?').join(', ')})`);
+          values.push(...sqlValue);
         } else {
-          whereConditions.push(`${key} = ?`);
-          whereValues.push(sqlValue);
+          conditions.push(`${key} = ?`);
+          values.push(
+            sqlValue instanceof Date
+              ? sqlValue.toISOString()
+              : typeof sqlValue === 'object'
+              ? JSON.stringify(sqlValue)
+              : sqlValue,
+          );
         }
       }
     }
+    return { conditions: conditions.length ? conditions.join(' AND ') : '1=1', values };
+  };
 
-    // Build the base SQL
-    let sql: string;
-    let allValues: any[] = [];
+  const applyMergeStrategy = (
+    existing: Record<string, any>,
+    incoming: Record<string, any>,
+    strategy: UpdateOptions['upsert'],
+    columns: string[],
+  ) => {
+    const merged = { ...existing };
+    const mergeFn =
+      typeof strategy === 'function'
+        ? strategy
+        : strategy?.mergeStrategy === 'preserve'
+        ? (curr: any, inc: any) => curr ?? inc
+        : strategy?.mergeStrategy === 'append'
+        ? (curr: any, inc: any) =>
+            typeof curr === 'string' && typeof inc === 'string' ? curr + inc : inc
+        : strategy?.mergeStrategy === 'numeric'
+        ? (curr: any, inc: any) =>
+            typeof curr === 'number' && typeof inc === 'number' ? curr + inc : inc
+        : (_: any, inc: any) => inc;
+    columns.forEach((key) => (merged[key] = mergeFn(existing[key], incoming[key])));
+    return merged;
+  };
 
-    // Handle UPSERT (INSERT OR UPDATE)
-    if (options.upsert) {
-      const { onConflict, conflictValues } = options.upsert;
-      const conflictColumns = Array.isArray(onConflict) ? onConflict : [onConflict];
+  const updateSingle = async (values: Record<string, any>, options: UpdateOptions = {}) => {
+    if (!options.where && !options.upsert)
+      throw new Error('Where clause or upsert configuration required');
 
-      const allColumns = [
-        ...new Set([...Object.keys(updateValues), ...Object.keys(conflictValues || {})]),
-      ];
+    let processed = await processValues(values, options);
+    const setClauses = Object.keys(processed).map((key) => `${key} = ?`);
+    if (!setClauses.length) throw new Error('No valid values provided');
 
-      const insertPlaceholders = allColumns.map(() => '?');
+    const { conditions, values: whereValues } = buildWhereClause(options.where);
+    const returningClause = options.returning
+      ? ` RETURNING ${
+          options.returning === true ? '*' : (options.returning as string[]).join(', ')
+        }`
+      : '';
+    const orderClause = options.orderBy?.length
+      ? ` ORDER BY ${options.orderBy.map(([col, dir]) => `${col} ${dir}`).join(', ')}`
+      : '';
+    const limitClause = options.limit ? ` LIMIT ${options.limit}` : '';
 
-      sql = `INSERT INTO ${tableName} (${allColumns.join(', ')})
-        VALUES (${insertPlaceholders.join(', ')})
-        ON CONFLICT(${conflictColumns.join(', ')}) DO UPDATE SET
-        ${setClauses.join(', ')}`;
-
-      // Values for INSERT part
-      for (const column of allColumns) {
-        if (updateValues[column] !== undefined) {
-          allValues.push(convertValueForSQLite(updateValues[column]));
-        } else if (conflictValues && conflictValues[column] !== undefined) {
-          allValues.push(convertValueForSQLite(conflictValues[column]));
-        } else {
-          allValues.push(null);
-        }
-      }
-
-      // Values for UPDATE part
-      allValues = [
-        ...allValues,
-        ...Object.keys(updateValues)
-          .filter((key) => updateValues[key] !== undefined)
-          .map((key) => convertValueForSQLite(updateValues[key])),
-      ];
-    } else {
-      // Regular UPDATE
-      if (whereConditions.length === 0) {
-        throw new Error('No valid conditions in where clause');
-      }
-
-      sql = `UPDATE ${tableName} SET ${setClauses.join(', ')} WHERE ${whereConditions.join(
-        ' AND ',
-      )}`;
-
-      // Add limit if specified
-      if (options.limit && typeof options.limit === 'number') {
-        sql += ` LIMIT ${options.limit}`;
-      }
-
-      allValues = [
-        ...Object.keys(updateValues)
-          .filter((key) => updateValues[key] !== undefined)
-          .map((key) => convertValueForSQLite(updateValues[key])),
-        ...whereValues,
-      ];
-    }
-
-    // Add RETURNING clause if requested
-    let returningClause = '';
-    if (options.returning) {
-      if (options.returning === true) {
-        returningClause = ' RETURNING *';
-      } else if (Array.isArray(options.returning) && options.returning.length > 0) {
-        returningClause = ` RETURNING ${options.returning.join(', ')}`;
-      }
-      sql += returningClause;
-    }
+    const executor =
+      options.transaction === 'new'
+        ? db
+        : options.transaction === 'required'
+        ? db
+        : options.transaction || db;
+    const inTransaction = options.transaction === 'new' || options.transaction === 'required';
+    inTransaction && (executor as DatabaseSync).exec('BEGIN TRANSACTION');
 
     try {
-      // Use transaction if provided
-      const executor = options.transaction || db;
+      let sql: string,
+        allValues: any[],
+        changes: number,
+        returnedRecords: any[] = [];
+
+      if (options.upsert) {
+        const { onConflict, conflictValues, mergeStrategy } = options.upsert;
+        const conflictColumns = (Array.isArray(onConflict) ? onConflict : [onConflict]).filter(
+          (col) => attributes[col],
+        );
+        const allColumns = [
+          ...new Set([...Object.keys(processed), ...Object.keys(conflictValues || {})]),
+        ];
+
+        if (mergeStrategy) {
+          const existing = db
+            .prepare(
+              `SELECT * FROM ${tableName} WHERE ${conflictColumns
+                .map((c) => `${c} = ?`)
+                .join(' AND ')}`,
+            )
+            .get(...conflictColumns.map((c) => processed[c] || conflictValues[c]));
+          if (existing) {
+            processed = applyMergeStrategy(
+              existing,
+              processed,
+              { onConflict, conflictValues, mergeStrategy },
+              Object.keys(processed),
+            );
+          }
+        }
+
+        sql = `INSERT INTO ${tableName} (${allColumns.join(', ')}) VALUES (${allColumns
+          .map(() => '?')
+          .join(', ')})
+          ON CONFLICT(${conflictColumns.join(', ')}) DO UPDATE SET ${setClauses.join(
+          ', ',
+        )}${returningClause}`;
+        allValues = [
+          ...allColumns.map((col) => processed[col] ?? conflictValues[col] ?? null),
+          ...Object.values(processed),
+        ];
+      } else {
+        sql = `UPDATE ${tableName} SET ${setClauses.join(
+          ', ',
+        )} WHERE ${conditions}${orderClause}${limitClause}${returningClause}`;
+        allValues = [...Object.values(processed), ...whereValues];
+      }
+
+      if (options.dryRun) {
+        inTransaction && (executor as DatabaseSync).exec('ROLLBACK');
+        return { changes: 1, returning: options.returning ? [processed] : undefined };
+      }
+
+      if (executor === 'none') throw new Error('No executor available');
       const stmt = executor.prepare(sql);
+      const result = returningClause ? stmt.all(...allValues) : stmt.run(...allValues);
+      changes = returningClause ? (result as any[]).length : Number((result as any).changes);
+      returnedRecords = returningClause ? (result as any[]) : [];
 
-      // Skip actual DB changes during dry runs
-      if (options.ignoreChanges) {
-        return { changes: 0 };
-      }
-
-      const result = stmt.run(...allValues);
-
-      const response: { changes: number; returning?: any[] } = {
-        changes: Number(result.changes),
-      };
-
-      // Handle returning data
-      if (returningClause && result.lastInsertRowid) {
-        const returningSql = `SELECT ${
-          options.returning === true ? '*' : (options.returning as string[]).join(', ')
-        } 
-          FROM ${tableName} WHERE rowid = ?`;
-        const returningStmt = executor.prepare(returningSql);
-        const returningRows = returningStmt.all(result.lastInsertRowid);
-        response.returning = returningRows;
-      }
-
-      return response;
+      options.afterUpdate?.({ changes, updatedRecords: returnedRecords });
+      inTransaction && (executor as DatabaseSync).exec('COMMIT');
+      return { changes, returning: options.returning ? returnedRecords : undefined };
     } catch (error) {
-      console.error(`Update error: ${sql}`, allValues);
-      throw new Error(`Update failed: ${error instanceof Error ? error.message : String(error)}`);
+      inTransaction && (executor as DatabaseSync).exec('ROLLBACK');
+      throw error;
     }
   };
+
+  const updateBatch = async (
+    values: Record<string, any>,
+    options: UpdateOptions & { batchSize: number },
+  ) => {
+    const { conditions, values: whereValues } = buildWhereClause(options.where);
+    const countStmt = db
+      .prepare(`SELECT COUNT(*) as total FROM ${tableName} WHERE ${conditions}`)
+      .get(...whereValues);
+    const total = (countStmt as any).total;
+    let changes = 0,
+      returnedRecords: any[] = [];
+
+    const inTransaction = options.transaction === 'required' || options.transaction === 'new';
+    inTransaction && db.exec('BEGIN TRANSACTION');
+
+    try {
+      for (let offset = 0; offset < total; offset += options.batchSize) {
+        const batchOptions = {
+          ...options,
+          limit: options.batchSize,
+          orderBy: options.orderBy || [['rowid', 'ASC']],
+          transaction: 'none' as const,
+        };
+        const result = await updateSingle(values, batchOptions);
+        changes += result.changes;
+        if (options.returning) returnedRecords.push(...(result.returning || []));
+      }
+      inTransaction && db.exec('COMMIT');
+      return { changes, returning: options.returning ? returnedRecords : undefined };
+    } catch (error) {
+      inTransaction && db.exec('ROLLBACK');
+      throw error;
+    }
+  };
+
+  return async (values: Record<string, any>, options: UpdateOptions = {}) =>
+    executeWithTimeout(
+      () =>
+        executeWithRetry(
+          () =>
+            options.batchSize && options.where && !options.upsert
+              ? updateBatch(values, { ...options, batchSize: options.batchSize })
+              : updateSingle(values, options),
+          options,
+        ),
+      options.timeout,
+    );
 }

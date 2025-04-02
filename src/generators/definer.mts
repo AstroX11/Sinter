@@ -31,40 +31,115 @@ export function defineModel(
   modelName: string,
   attributes: ModelAttributes,
   options: DefineModelOptions,
-): Models {
+) {
   const modelDefinition = createModelDefinition(modelName, attributes, options);
 
   try {
     db.exec(generateCreateTableSQL(modelDefinition));
-    const execs = {
+    const InstanceModels = {
       definition: modelDefinition,
-      create: createModelCreateMethod(db, modelDefinition),
-      findOrCreate: createFindOrCreateMethod(db, modelDefinition),
-      findByPk: createFindByPkMethod(db, modelDefinition),
-      findOne: createFindOneMethod(db, modelDefinition),
-      findAll: createFindAllMethod(db, modelDefinition),
-      findAndCountAll: createFindAllMethod(db, modelDefinition),
-      count: createMathMethods(db, modelDefinition).count,
-      max: createMathMethods(db, modelDefinition).max,
-      min: createMathMethods(db, modelDefinition).min,
-      sum: createMathMethods(db, modelDefinition).sum,
-      increment: createIncrementDecrementMethods(db, modelDefinition).increment,
-      decrement: createIncrementDecrementMethods(db, modelDefinition).decrement,
-      bulkCreate: createBulkCreateMethod(db, modelDefinition),
-      update: createUpdateMethod(db, modelDefinition),
-      destroy: createDestroyMethod(db, modelDefinition),
-      truncate: createTruncateMethod(db, modelDefinition),
-      restore: createRestoreMethod(db, modelDefinition),
-      upsert: createUpsertMethod(db, modelDefinition),
+      create: async (...args: Parameters<ReturnType<typeof createModelCreateMethod>>) => {
+        return Promise.resolve(createModelCreateMethod(db, modelDefinition)(...args)).then(
+          () => InstanceModels,
+        );
+      },
+      findOrCreate: async (...args: Parameters<ReturnType<typeof createFindOrCreateMethod>>) => {
+        return Promise.resolve(createFindOrCreateMethod(db, modelDefinition)(...args)).then(
+          () => InstanceModels,
+        );
+      },
+      findByPk: async (...args: Parameters<ReturnType<typeof createFindByPkMethod>>) => {
+        return Promise.resolve(createFindByPkMethod(db, modelDefinition)(...args)).then(
+          () => InstanceModels,
+        );
+      },
+      findOne: async (...args: Parameters<ReturnType<typeof createFindOneMethod>>) => {
+        return Promise.resolve(createFindOneMethod(db, modelDefinition)(...args)).then(
+          () => InstanceModels,
+        );
+      },
+      findAll: async (...args: Parameters<ReturnType<typeof createFindAllMethod>>) => {
+        return Promise.resolve(createFindAllMethod(db, modelDefinition)(...args)).then(
+          () => InstanceModels,
+        );
+      },
+      findAndCountAll: async (...args: Parameters<ReturnType<typeof createFindAllMethod>>) => {
+        return Promise.resolve(createFindAllMethod(db, modelDefinition)(...args)).then(
+          () => InstanceModels,
+        );
+      },
+      count: async (...args: Parameters<ReturnType<typeof createMathMethods>['count']>) => {
+        return Promise.resolve(createMathMethods(db, modelDefinition).count(...args)).then(
+          () => InstanceModels,
+        );
+      },
+      max: async (...args: Parameters<ReturnType<typeof createMathMethods>['max']>) => {
+        return Promise.resolve(createMathMethods(db, modelDefinition).max(...args)).then(
+          () => InstanceModels,
+        );
+      },
+      min: async (...args: Parameters<ReturnType<typeof createMathMethods>['min']>) => {
+        return Promise.resolve(createMathMethods(db, modelDefinition).min(...args)).then(
+          () => InstanceModels,
+        );
+      },
+      sum: async (...args: Parameters<ReturnType<typeof createMathMethods>['sum']>) => {
+        return Promise.resolve(createMathMethods(db, modelDefinition).sum(...args)).then(
+          () => InstanceModels,
+        );
+      },
+      increment: async (
+        ...args: Parameters<ReturnType<typeof createIncrementDecrementMethods>['increment']>
+      ) => {
+        return Promise.resolve(
+          createIncrementDecrementMethods(db, modelDefinition).increment(...args),
+        ).then(() => InstanceModels);
+      },
+      decrement: async (
+        ...args: Parameters<ReturnType<typeof createIncrementDecrementMethods>['decrement']>
+      ) => {
+        return Promise.resolve(
+          createIncrementDecrementMethods(db, modelDefinition).decrement(...args),
+        ).then(() => InstanceModels);
+      },
+      bulkCreate: async (...args: Parameters<ReturnType<typeof createBulkCreateMethod>>) => {
+        return Promise.resolve(createBulkCreateMethod(db, modelDefinition)(...args)).then(
+          () => InstanceModels,
+        );
+      },
+      update: async (...args: Parameters<ReturnType<typeof createUpdateMethod>>) => {
+        return Promise.resolve(createUpdateMethod(db, modelDefinition)(...args)).then(
+          () => InstanceModels,
+        );
+      },
+      destroy: async (...args: Parameters<ReturnType<typeof createDestroyMethod>>) => {
+        return Promise.resolve(createDestroyMethod(db, modelDefinition)(...args)).then(
+          () => InstanceModels,
+        );
+      },
+      truncate: async (...args: Parameters<ReturnType<typeof createTruncateMethod>>) => {
+        return Promise.resolve(createTruncateMethod(db, modelDefinition)(...args)).then(
+          () => InstanceModels,
+        );
+      },
+      restore: async (...args: Parameters<ReturnType<typeof createRestoreMethod>>) => {
+        return Promise.resolve(createRestoreMethod(db, modelDefinition)(...args)).then(
+          () => InstanceModels,
+        );
+      },
+      upsert: async (...args: Parameters<ReturnType<typeof createUpsertMethod>>) => {
+        return Promise.resolve(createUpsertMethod(db, modelDefinition)(...args)).then(
+          () => InstanceModels,
+        );
+      },
     };
 
-    models.set(modelName, execs);
+    models.set(modelName, InstanceModels);
 
     createIndexes(db, modelDefinition);
     const triggerSQLs = generateTriggerSQL(modelDefinition);
     triggerSQLs.forEach((sql) => db.exec(sql));
-
-    return execs;
+    return InstanceModels;
   } catch (error) {
     handleDefineError(error, modelName, modelDefinition);
     throw error;
