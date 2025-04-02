@@ -3,7 +3,7 @@ import type { ModelDefinition, HookFunction } from '../Types.mjs';
 import { convertToSqliteValue } from './utils.js';
 import { executeHooks } from '../hooks/hookRunner.js';
 import { getTransaction } from '../utils/transactions.js';
-import { handleBatchInsert, validateValue } from '../generators/schema.mjs';
+import { handleBatchInsert, validateValue } from '../generators/schema.js';
 
 /**
  * Creates only the create method for a model

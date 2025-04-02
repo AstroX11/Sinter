@@ -5,17 +5,20 @@ import type {
   ModelAttributes,
   ModelExports as Models,
 } from '../Types.mjs';
-import { pluralize } from './utils.js';
-import { addTimestamps, addParanoidField, validateModelAttributes } from './schema.mjs';
+import {
+  addTimestamps,
+  addParanoidField,
+  validateModelAttributes,
+  getTableName,
+} from './schema.js';
 import { generateCreateTableSQL } from './tables.js';
 import { isSQLiteError } from '../Types.mjs';
 import { generateTriggerSQL } from './triggers.js';
-import { createIndexes } from './operations.js';
-import { createModel } from '../models/index.js';
+import { createIndexes } from './schema.js';
+import { ModelFunctions } from '../models/index.js';
 
 export function defineModel(
   db: DatabaseSync,
-  model: Map<string, any>,
   modelName: string,
   attributes: ModelAttributes,
   options: DefineModelOptions,
@@ -25,12 +28,10 @@ export function defineModel(
   try {
     db.exec(generateCreateTableSQL(modelDefinition));
 
-    model.set(modelName, createModel(db, modelDefinition));
-
     createIndexes(db, modelDefinition);
     const triggerSQLs = generateTriggerSQL(modelDefinition);
     triggerSQLs.forEach((sql) => db.exec(sql));
-    return createModel(db, modelDefinition);
+    return ModelFunctions(db, modelDefinition);
   } catch (error) {
     handleDefineError(error, modelName, modelDefinition);
     throw error;
@@ -61,13 +62,6 @@ function createModelDefinition(
   addTimestamps(modelDef);
   addParanoidField(modelDef);
   return modelDef;
-}
-
-function getTableName(modelName: string, options: DefineModelOptions): string {
-  if (options?.tableName) {
-    return options?.freezeTableName ? options.tableName : pluralize(options.tableName);
-  }
-  return options?.freezeTableName ? modelName : pluralize(modelName);
 }
 
 function handleDefineError(error: unknown, modelName: string, def: ModelDefinition): unknown {

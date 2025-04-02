@@ -1,10 +1,5 @@
 import { ModelDefinition, TriggerDefinition } from '../Types.mjs';
 
-/**
- * Generates SQLite CREATE TRIGGER statements from a model definition
- * @param def The model definition object
- * @returns An array of CREATE TRIGGER statements
- */
 export function generateTriggerSQL(def: ModelDefinition): string[] {
   const triggerStatements: string[] = [];
   if (!def.options?.triggers || !Array.isArray(def.options.triggers)) return triggerStatements;
@@ -14,16 +9,10 @@ export function generateTriggerSQL(def: ModelDefinition): string[] {
   return triggerStatements;
 }
 
-/**
- * Builds a single CREATE TRIGGER statement
- * @param tableName The table name
- * @param trigger The trigger definition object
- * @returns A CREATE TRIGGER statement
- */
-function buildTriggerSQL(tableName: string, trigger: TriggerDefinition): string {
-  const ifNotExists = trigger.ifNotExists ? 'IF NOT EXISTS ' : '',
-    timing = validateTriggerTiming(trigger.timing),
-    event = validateTriggerEvent(trigger.event);
+export function buildTriggerSQL(tableName: string, trigger: TriggerDefinition): string {
+  const ifNotExists = trigger.ifNotExists ? 'IF NOT EXISTS ' : '';
+  const timing = validateTriggerTiming(trigger.timing);
+  const event = validateTriggerEvent(trigger.event);
   let sql = `CREATE TRIGGER ${ifNotExists}${trigger.name} ${timing} ${event} ON ${tableName} `;
   if (event === 'UPDATE' && trigger.columns && trigger.columns.length > 0)
     sql += `OF ${trigger.columns.join(', ')} `;
@@ -36,14 +25,9 @@ function buildTriggerSQL(tableName: string, trigger: TriggerDefinition): string 
       : 'BEGIN END');
 }
 
-/**
- * Validates and normalizes trigger timing
- * @param timing The trigger timing string
- * @returns A validated trigger timing
- */
-function validateTriggerTiming(timing: string): string {
-  const validTimings = ['BEFORE', 'AFTER', 'INSTEAD OF'],
-    normalizedTiming = timing.toUpperCase();
+export function validateTriggerTiming(timing: string): string {
+  const validTimings = ['BEFORE', 'AFTER', 'INSTEAD OF'];
+  const normalizedTiming = timing.toUpperCase();
   if (!validTimings.includes(normalizedTiming))
     throw new Error(
       `Invalid trigger timing: ${timing}. Must be one of: ${validTimings.join(', ')}`,
@@ -51,14 +35,9 @@ function validateTriggerTiming(timing: string): string {
   return normalizedTiming;
 }
 
-/**
- * Validates and normalizes trigger event
- * @param event The trigger event string
- * @returns A validated trigger event
- */
-function validateTriggerEvent(event: string): string {
-  const validEvents = ['INSERT', 'UPDATE', 'DELETE'],
-    normalizedEvent = event.toUpperCase();
+export function validateTriggerEvent(event: string): string {
+  const validEvents = ['INSERT', 'UPDATE', 'DELETE'];
+  const normalizedEvent = event.toUpperCase();
   if (!validEvents.includes(normalizedEvent))
     throw new Error(`Invalid trigger event: ${event}. Must be one of: ${validEvents.join(', ')}`);
   return normalizedEvent;

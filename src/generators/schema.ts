@@ -4,7 +4,47 @@ import type {
   ColumnDefinition,
   ModelAttributes,
   ValidationResult,
+  DefineModelOptions,
 } from '../Types.mjs';
+import { pluralize } from './utils.js';
+import { generateIndexSQL } from './generator.js';
+
+export function validateIndex(db: DatabaseSync, indexName: string): boolean {
+  try {
+    const result = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='index' AND name=?")
+      .get(indexName);
+    return !!result;
+  } catch (error) {
+    console.error(
+      `Failed to validate index ${indexName}:`,
+      error instanceof Error ? error.message : String(error),
+    );
+    return false;
+  }
+}
+
+export function createIndexes(db: DatabaseSync, def: ModelDefinition): void {
+  if (!db) throw new Error('Database instance is required');
+  if (!def?.tableName) throw new Error('Model definition requires a tableName');
+
+  const indexSQLs = generateIndexSQL(def);
+
+  for (const sql of indexSQLs) {
+    try {
+      db.exec(sql);
+      const indexName = sql.match(/CREATE\s+INDEX\s+([^\s]+)/i)?.[1];
+      if (indexName && !validateIndex(db, indexName)) {
+        console.warn(`Index ${indexName} was not created successfully`);
+      }
+    } catch (error) {
+      console.error(
+        `Failed to create index: ${sql}`,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
+}
 
 export function addTimestamps(def: ModelDefinition): void {
   if (def?.options?.timestamps) {
@@ -28,6 +68,13 @@ export function addParanoidField(def: ModelDefinition): void {
       allowNull: true,
     };
   }
+}
+
+export function getTableName(modelName: string, options: DefineModelOptions): string {
+  if (options?.tableName) {
+    return options?.freezeTableName ? options.tableName : pluralize(options.tableName);
+  }
+  return options?.freezeTableName ? modelName : pluralize(modelName);
 }
 
 export function validateModelAttributes(modelName: string, attributes: ModelAttributes): void {

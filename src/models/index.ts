@@ -4,7 +4,7 @@ import { createFindByPkMethod } from './findByPk.js';
 import { createFindOneMethod } from './findOne.js';
 import { createFindAllMethod } from './findAll.js';
 import { createMathMethods } from './maths.js';
-import { createIncrementDecrementMethods } from './++--.js';
+import { createIncrementDecrementMethods } from './min_max.js';
 import { createBulkCreateMethod } from './bulkCreate.js';
 import { createUpdateMethod } from './update.js';
 import { createDestroyMethod } from './destroy.js';
@@ -19,14 +19,21 @@ import type { ModelDefinition } from '../Types.mjs';
  * @param {DatabaseSync} db - The SQLite database connection
  * @param {ModelDefinition} modelDefinition - The model definition configuration
  */
-export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) => ({
+export const ModelFunctions = (db: DatabaseSync, modelDefinition: ModelDefinition) => ({
   /**
    * Creates a new record in the database
    * @param {...any[]} args - Arguments for record creation
    * @returns {Promise<any>} The created record
    */
   create: (...args: Parameters<ReturnType<typeof createModelCreateMethod>>) =>
-    createModelCreateMethod(db, modelDefinition)(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createModelCreateMethod(db, modelDefinition)(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Finds or creates a record based on conditions
@@ -34,7 +41,14 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    * @returns {Promise<any>} The found or created record
    */
   findOrCreate: (...args: Parameters<ReturnType<typeof createFindOrCreateMethod>>) =>
-    createFindOrCreateMethod(db, modelDefinition)(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createFindOrCreateMethod(db, modelDefinition)(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Finds a record by primary key
@@ -42,7 +56,14 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    * @returns {Promise<any>} The found record or null
    */
   findByPk: (...args: Parameters<ReturnType<typeof createFindByPkMethod>>) =>
-    createFindByPkMethod(db, modelDefinition)(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createFindByPkMethod(db, modelDefinition)(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Finds one record matching the conditions
@@ -50,7 +71,14 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    * @returns {Promise<any>} The found record or null
    */
   findOne: (...args: Parameters<ReturnType<typeof createFindOneMethod>>) =>
-    createFindOneMethod(db, modelDefinition)(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createFindOneMethod(db, modelDefinition)(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Finds all records matching the conditions
@@ -58,7 +86,14 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    * @returns {Promise<any[]>} Array of matching records
    */
   findAll: (...args: Parameters<ReturnType<typeof createFindAllMethod>>) =>
-    createFindAllMethod(db, modelDefinition)(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createFindAllMethod(db, modelDefinition)(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Finds all records and counts them
@@ -66,7 +101,14 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    * @returns {Promise<any[]>} Array of matching records with count
    */
   findAndCountAll: (...args: Parameters<ReturnType<typeof createFindAllMethod>>) =>
-    createFindAllMethod(db, modelDefinition)(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createFindAllMethod(db, modelDefinition)(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Counts records matching the conditions
@@ -74,7 +116,14 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    * @returns {Promise<number>} Number of matching records
    */
   count: (...args: Parameters<ReturnType<typeof createMathMethods>['count']>) =>
-    createMathMethods(db, modelDefinition).count(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createMathMethods(db, modelDefinition).count(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Finds maximum value of a field
@@ -82,7 +131,14 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    * @returns {Promise<number>} Maximum value
    */
   max: (...args: Parameters<ReturnType<typeof createMathMethods>['max']>) =>
-    createMathMethods(db, modelDefinition).max(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createMathMethods(db, modelDefinition).max(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Finds minimum value of a field
@@ -90,7 +146,14 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    * @returns {Promise<number>} Minimum value
    */
   min: (...args: Parameters<ReturnType<typeof createMathMethods>['min']>) =>
-    createMathMethods(db, modelDefinition).min(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createMathMethods(db, modelDefinition).min(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Calculates sum of a field
@@ -98,7 +161,14 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    * @returns {Promise<number>} Sum of values
    */
   sum: (...args: Parameters<ReturnType<typeof createMathMethods>['sum']>) =>
-    createMathMethods(db, modelDefinition).sum(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createMathMethods(db, modelDefinition).sum(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Increments field values
@@ -107,7 +177,15 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    */
   increment: (
     ...args: Parameters<ReturnType<typeof createIncrementDecrementMethods>['increment']>
-  ) => createIncrementDecrementMethods(db, modelDefinition).increment(...args),
+  ) =>
+    new Promise((resolve, reject) => {
+      try {
+        const result = createIncrementDecrementMethods(db, modelDefinition).increment(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Decrements field values
@@ -116,7 +194,15 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    */
   decrement: (
     ...args: Parameters<ReturnType<typeof createIncrementDecrementMethods>['decrement']>
-  ) => createIncrementDecrementMethods(db, modelDefinition).decrement(...args),
+  ) =>
+    new Promise((resolve, reject) => {
+      try {
+        const result = createIncrementDecrementMethods(db, modelDefinition).decrement(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Creates multiple records at once
@@ -124,7 +210,14 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    * @returns {Promise<any[]>} Created records
    */
   bulkCreate: (...args: Parameters<ReturnType<typeof createBulkCreateMethod>>) =>
-    createBulkCreateMethod(db, modelDefinition)(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createBulkCreateMethod(db, modelDefinition)(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Updates records matching conditions
@@ -132,7 +225,14 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    * @returns {Promise<any>} Update result
    */
   update: (...args: Parameters<ReturnType<typeof createUpdateMethod>>) =>
-    createUpdateMethod(db, modelDefinition)(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createUpdateMethod(db, modelDefinition)(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Deletes records matching conditions
@@ -140,7 +240,14 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    * @returns {Promise<number>} Number of deleted records
    */
   destroy: (...args: Parameters<ReturnType<typeof createDestroyMethod>>) =>
-    createDestroyMethod(db, modelDefinition)(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createDestroyMethod(db, modelDefinition)(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Truncates the table
@@ -148,7 +255,14 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    * @returns {Promise<void>}
    */
   truncate: (...args: Parameters<ReturnType<typeof createTruncateMethod>>) =>
-    createTruncateMethod(db, modelDefinition)(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createTruncateMethod(db, modelDefinition)(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Restores soft-deleted records
@@ -156,7 +270,14 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    * @returns {Promise<any>} Restored records
    */
   restore: (...args: Parameters<ReturnType<typeof createRestoreMethod>>) =>
-    createRestoreMethod(db, modelDefinition)(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createRestoreMethod(db, modelDefinition)(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 
   /**
    * Updates or inserts a record
@@ -164,5 +285,12 @@ export const createModel = (db: DatabaseSync, modelDefinition: ModelDefinition) 
    * @returns {Promise<any>} Updated or inserted record
    */
   upsert: (...args: Parameters<ReturnType<typeof createUpsertMethod>>) =>
-    createUpsertMethod(db, modelDefinition)(...args),
+    new Promise((resolve, reject) => {
+      try {
+        const result = createUpsertMethod(db, modelDefinition)(...args);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
 });

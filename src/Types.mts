@@ -7,7 +7,7 @@ import { createFindByPkMethod } from './models/findByPk.js';
 import { createFindOneMethod } from './models/findOne.js';
 import { createFindAllMethod } from './models/findAll.js';
 import { createMathMethods } from './models/maths.js';
-import { createIncrementDecrementMethods } from './models/++--.js';
+import { createIncrementDecrementMethods } from './models/min_max.js';
 import { createBulkCreateMethod } from './models/bulkCreate.js';
 import { createUpdateMethod } from './models/update.js';
 import { createDestroyMethod } from './models/destroy.js';
