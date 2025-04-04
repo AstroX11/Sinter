@@ -63,7 +63,7 @@ export function createUpdateMethod(
     );
   };
 
-  const buildWhereClause = (where: Record<string, any> = {}) => {
+  const buildWhereClause = (where: Record<string, any> | string = {}) => {
     const conditions: string[] = [];
     const values: any[] = [];
 
