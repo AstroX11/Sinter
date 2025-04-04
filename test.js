@@ -8,6 +8,6 @@ const database = new Database('test.db', {
 });
 
 const user = database.define('AstroX11', {
-  id: { type: 'STRING' },
+  id: { type: 'STRING', defaultValue: 'AstroX11' },
 });
 

@@ -428,7 +428,7 @@ export interface UpsertOptions {
   updateExclude?: string[];
   updateOnly?: string[];
   mergeStrategy?: MergeStrategy;
-  where?: Record<string, any>;
+  where?: Record<string, any> | string;
   returning?: string | string[];
   beforeUpsert?: (
     values: Record<string, any>,
