@@ -428,7 +428,7 @@ export interface UpsertOptions {
   updateExclude?: string[];
   updateOnly?: string[];
   mergeStrategy?: MergeStrategy;
-  where?: Record<string, any> | string;
+  where?: Record<string, any>;
   returning?: string | string[];
   beforeUpsert?: (
     values: Record<string, any>,
@@ -449,7 +449,7 @@ export interface UpsertOptions {
 }
 
 export interface UpdateOptions {
-  where?: Record<string, any>;
+  where?: Record<string, any> | string;
   returning?: string[] | boolean;
   limit?: number;
   transaction?: 'required' | 'new' | 'none';
