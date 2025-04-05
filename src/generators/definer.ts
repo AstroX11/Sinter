@@ -4,6 +4,8 @@ import type {
   DefineModelOptions,
   ModelAttributes,
   ModelExports as Models,
+  DatabaseSyncOptions,
+  DatabaseExtraSettings,
 } from '../Types.mjs';
 import {
   addTimestamps,
@@ -22,7 +24,8 @@ export function defineModel(
   modelName: string,
   attributes: ModelAttributes,
   options: DefineModelOptions,
-) {
+  optionsDB: DatabaseExtraSettings,
+): ModelFunctions {
   const modelDefinition = createModelDefinition(modelName, attributes, options);
 
   try {
@@ -31,7 +34,7 @@ export function defineModel(
     createIndexes(db, modelDefinition);
     const triggerSQLs = generateTriggerSQL(modelDefinition);
     triggerSQLs.forEach((sql) => db.exec(sql));
-    return ModelFunctions(db, modelDefinition);
+    return ModelFunctions(db, modelDefinition, optionsDB);
   } catch (error) {
     handleDefineError(error, modelName, modelDefinition);
     throw error;

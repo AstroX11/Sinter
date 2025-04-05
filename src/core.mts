@@ -1,16 +1,23 @@
 import { DatabaseSync } from 'node:sqlite';
-import type { DatabaseSyncOptions, DefineModelOptions, ModelAttributes } from './Types.mts';
+import type {
+  DatabaseExtraSettings,
+  DatabaseSyncOptions,
+  DefineModelOptions,
+  ModelAttributes,
+} from './Types.mts';
 import { defineModel } from './generators/index.mjs';
 
 export class Database {
   private db: DatabaseSync;
+  public optionsDB: DatabaseSyncOptions | DatabaseExtraSettings;
 
-  constructor(location: string, options?: DatabaseSyncOptions) {
+  constructor(location: string, options: DatabaseSyncOptions | DatabaseExtraSettings) {
     this.db = new DatabaseSync(location, options);
+    this.optionsDB = options;
   }
 
   define(modelName: string, attributes: ModelAttributes = {}, options: DefineModelOptions = {}) {
-    return defineModel(this.db, modelName, attributes, options);
+    return defineModel(this.db, modelName, attributes, options, this.optionsDB);
   }
 
   /**

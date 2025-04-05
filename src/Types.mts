@@ -38,6 +38,21 @@ export interface ModelExports {
 }
 
 /**
+ * Database Extra Settings such as verbose logging, memory mode, etc.
+ */
+export interface DatabaseExtraSettings {
+  verbose?: boolean;
+  memory?: boolean;
+  journalMode?: 'DELETE' | 'TRUNCATE' | 'PERSIST' | 'MEMORY' | 'WAL' | 'OFF';
+  cacheSize?: number;
+  busyTimeout?: number;
+  foreignKeys?: boolean;
+  tempStore?: 'DEFAULT' | 'FILE' | 'MEMORY';
+  readOnly?: boolean;
+  sharedCache?: boolean;
+}
+
+/**
  * Definition of a database model
  */
 export interface ModelDefinition {
@@ -458,12 +473,19 @@ export interface UpdateOptions {
   retryOptions?: { attempts: number; backoff: 'fixed' | 'exponential'; delay: number };
   dryRun?: boolean;
   validate?: (values: Record<string, any>) => Promise<boolean> | boolean;
-  beforeUpdate?: (values: Record<string, any>) => Promise<Record<string, any>> | Record<string, any>;
+  beforeUpdate?: (
+    values: Record<string, any>,
+  ) => Promise<Record<string, any>> | Record<string, any>;
   afterUpdate?: (result: { changes: number; updatedRecords: any[] }) => Promise<void> | void;
   upsert?: {
     onConflict: string | string[];
     conflictValues: Record<string, any>;
-    mergeStrategy?: 'replace' | 'preserve' | 'append' | 'numeric' | ((current: any, incoming: any) => any);
+    mergeStrategy?:
+      | 'replace'
+      | 'preserve'
+      | 'append'
+      | 'numeric'
+      | ((current: any, incoming: any) => any);
   };
   orderBy?: [string, 'ASC' | 'DESC'][];
   batchSize?: number;
@@ -476,7 +498,6 @@ export interface BulkCreateOptions {
   updateOnConflict?: boolean;
   batchSize?: number;
 }
-
 
 /**
  * Type guard for SQLite errors
