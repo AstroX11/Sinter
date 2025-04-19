@@ -2,14 +2,14 @@
   "name": "@astrox11/sqlite",
   "version": "1.8.0",
   "description": "A simple ORM for node:sqlite",
-  "main": "./dist/src/index.mjs",
+  "main": "./dist/src/index.js",
   "type": "module",
   "repository": "https://github.com/AstroX11/sqlite",
   "author": "AstroX11 <danielfx0012@gmail.com>",
   "license": "MIT",
   "private": false,
   "exports": {
-    ".": "./dist/src/index.mjs"
+    ".": "./dist/src/index.js"
   },
   "files": [
     "dist/**/*"
@@ -22,8 +22,8 @@
     "test": "node --no-warnings test.js"
   },
   "dependencies": {
-    "@types/node": "^22.13.14",
-    "typescript": "^5.8.2"
+    "@types/node": "^22.14.1",
+    "typescript": "^5.8.3"
   },
   "publishConfig": {
     "access": "public"
