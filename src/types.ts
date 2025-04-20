@@ -167,3 +167,34 @@ export type CreationAttributes<S extends Schema, O extends ModelOptions> = {
   ? { createdAt?: number | null; updatedAt?: number | null }
   : {}) &
   (O['paranoid'] extends true ? { deletedAt?: number | null } : {});
+
+// Add after CreationAttributes
+export type WhereValue = any | { json?: [string, any]; literal?: string };
+
+export interface ExtendedWhereOptions {
+  [key: string]: WhereValue | ExtendedWhereOptions[] | undefined;
+  or?: ExtendedWhereOptions[];
+  and?: ExtendedWhereOptions[];
+}
+
+export interface IncludeOptions {
+  model: { new(): any };
+  as?: string;
+  include?: IncludeOptions[];
+  required?: boolean;
+  attributes?: string[];
+}
+
+export interface WhereOptions {
+  [key: string]: any | { json?: [string, any]; literal?: string };
+}
+
+export interface FindAllOptions<S extends Schema, O extends ModelOptions> {
+  where?: ExtendedWhereOptions;
+  include?: IncludeOptions[];
+  attributes?: (keyof S | 'createdAt' | 'updatedAt' | 'deletedAt')[];
+  limit?: number;
+  offset?: number;
+  order?: (string | [string, 'ASC' | 'DESC'])[];
+  groupBy?: string | string[];
+}

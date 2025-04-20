@@ -34,5 +34,14 @@ export default class Database {
   define(tableName: string, schema: Schema, options: ModelOptions = {}) {
     return model(this.#db, tableName, schema, options);
   }
+
+  static async exec(query: string): Promise<unknown> {
+    return Promise.resolve(this.exec(query))
+  }
+
+  static async prepare(query: string): Promise<unknown> {
+    return Promise.resolve(this.prepare(query))
+  }
+
 }
 export * from './types.js'
