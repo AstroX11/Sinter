@@ -6,25 +6,6 @@ export function model(db: DatabaseSync, tableName: string, schema: Schema, optio
   setupTable(db, tableName, schema, options);
 
   return class Model {
-    /**
-    * Creates a new `message` record in an in-memory database.
-    *
-    * Example usage:
-    * ```js
-    * import Database, { DataType } from '@astrox11/sqlite';
-    * 
-    * const db = new Database(':memory:');
-    * 
-    * db.define('message', {
-    *   id: { type: DataType.STRING, allowNull: true },
-    *   message: { type: DataType.JSON, allowNull: true }
-    * }).create({ id: '1234455', message: JSON.stringify({ car: 'bmw' }) });
-    * ```
-    *
-    * @param {Object} data - The data to create a new message entry with.
-    * @param {string} data.id - The ID of the message.
-    * @param {Object} data.message - The message content as a JSON object.
-    */
     static async create(data: CreationAttributes<typeof schema, typeof options>) {
       const { timestamps = true, paranoid = false, underscored = false } = options;
       const insertData: Record<string, SQLInputValue> = { ...data };

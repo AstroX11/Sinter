@@ -19,7 +19,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "node --no-warnings test.js"
+    "test": "ts-node --esm test.ts"
   },
   "dependencies": {
     "@types/node": "^22.14.1",

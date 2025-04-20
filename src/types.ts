@@ -154,16 +154,16 @@ export type SQLInputValue = string | number | boolean | null | Buffer;
 export type CreationAttributes<S extends Schema, O extends ModelOptions> = {
   [K in keyof S as S[K]['isVirtual'] extends true ? never : K]: S[K]['allowNull'] extends true
   ? S[K]['autoIncrement'] extends true
-  ? DataTypeToTS[S[K]['type']] | undefined
+  ? DataTypeToTS[S[K]['type']] | undefined | null
   : S[K]['generatedAs'] extends string
-  ? DataTypeToTS[S[K]['type']] | undefined
+  ? DataTypeToTS[S[K]['type']] | undefined | null
   : DataTypeToTS[S[K]['type']] | null
   : S[K]['autoIncrement'] extends true
-  ? DataTypeToTS[S[K]['type']] | undefined
+  ? DataTypeToTS[S[K]['type']] | undefined | null
   : S[K]['generatedAs'] extends string
-  ? DataTypeToTS[S[K]['type']] | undefined
-  : DataTypeToTS[S[K]['type']];
+  ? DataTypeToTS[S[K]['type']] | undefined | null
+  : DataTypeToTS[S[K]['type']] | null;
 } & (O['timestamps'] extends true
-  ? { createdAt?: number; updatedAt?: number }
+  ? { createdAt?: number | null; updatedAt?: number | null }
   : {}) &
   (O['paranoid'] extends true ? { deletedAt?: number | null } : {});
