@@ -1,13 +1,12 @@
-import Database, { DataType } from './dist/src/index.js';
+import Database, { DataType } from '@astrox11/sqlite'
 
-const db = new Database(':memory:');
+const db = new Database(':memory:', {/** other options **/ })
 
-const user = db.define('users', {
-  id: { type: DataType.INTEGER, primaryKey: true, defaultValue: 1 },
-  name: { type: DataType.STRING }
+const Users = db.define('usersTable', {
+  name: { type: DataType.STRING, primaryKey: true },
+  password: { type: DataType.INTEGER, allowNull: false }
 })
 
+const result = await Users.create({ name: 'AstroX11', password: '123' })
 
-user.create({ id: 20, name: 'AstroX11' })
-
-console.log(await user.findByPk(20))
+console.log(result)
