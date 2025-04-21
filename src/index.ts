@@ -44,4 +44,5 @@ export default class Database {
   }
 
 }
+export * from './functions.js'
 export * from './types.js'

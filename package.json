@@ -1,6 +1,6 @@
 {
   "name": "@astrox11/sqlite",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "A simple ORM for node:sqlite",
   "main": "./dist/src/index.js",
   "type": "module",
@@ -19,7 +19,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "ts-node --esm test.ts"
+    "test": "node test"
   },
   "dependencies": {
     "@types/node": "^22.14.1",
