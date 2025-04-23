@@ -1,6 +1,6 @@
 {
   "name": "@astrox11/sqlite",
-  "version": "1.8.2",
+  "version": "2.0.0",
   "description": "A simple ORM for node:sqlite",
   "main": "./dist/src/index.js",
   "type": "module",

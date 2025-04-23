@@ -1,6 +1,6 @@
 import { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { setupTable } from './hooks.js';
-import type { Schema, ModelOptions, CreationAttributes, FindAllOptions, ExtendedWhereOptions } from './types.js';
+import { type Schema, type ModelOptions, type CreationAttributes, type FindAllOptions, type ExtendedWhereOptions, DataType } from './types.js';
 
 function isSQLInputValue(value: unknown): value is SQLInputValue {
   return (
@@ -333,10 +333,10 @@ export function model(db: DatabaseSync, tableName: string, schema: Schema, optio
         }
       }
 
-      const existingRecord = await Model.findOne({ where: lookupWhere });
+      const existingRecord = await this.findOne({ where: lookupWhere });
 
       if (!existingRecord) {
-        return Model.create(processedValues as CreationAttributes<typeof schema, typeof options>);
+        return this.create(processedValues as CreationAttributes<typeof schema, typeof options>);
       }
 
       const updateValues = { ...processedValues };
@@ -353,8 +353,281 @@ export function model(db: DatabaseSync, tableName: string, schema: Schema, optio
         return existingRecord;
       }
 
-      await Model.update(updateValues, { where: lookupWhere });
-      return Model.findOne({ where: lookupWhere });
+      await this.update(updateValues, { where: lookupWhere });
+      return this.findOne({ where: lookupWhere });
+    }
+
+    static async destroy(Destoryoptions: { where: ExtendedWhereOptions; force?: boolean }): Promise<number | unknown> {
+      const { paranoid = false } = options;
+      const { where, force = false } = Destoryoptions;
+
+      if (paranoid && !force) {
+        // Soft delete
+        return this.update({ deletedAt: Date.now() }, { where });
+      }
+
+      // Hard delete
+      const whereClauses: string[] = [];
+      const values: SQLInputValue[] = [];
+
+      const whereStr = parseWhere(where, values);
+      if (whereStr) whereClauses.push(whereStr);
+
+      if (paranoid) {
+        whereClauses.push('deletedAt IS NOT NULL');
+      }
+
+      const sql = `DELETE FROM ${tableName} WHERE ${whereClauses.join(' AND ')}`;
+      const stmt = db.prepare(sql);
+      const result = stmt.run(...values);
+      return result.changes as number;
+    }
+
+    static async truncate({ cascade = false }: { cascade?: boolean } = {}): Promise<void> {
+      if (cascade) {
+        // Note: SQLite doesn't support CASCADE in TRUNCATE, so we use DELETE
+        db.prepare(`DELETE FROM ${tableName}`).run();
+        // Reset autoincrement counters
+        db.prepare(`DELETE FROM sqlite_sequence WHERE name = ?`).run(tableName);
+      } else {
+        db.prepare(`DELETE FROM ${tableName}`).run();
+      }
+    }
+
+    // Math/Aggregation methods
+    static async count(countOptions: { where?: ExtendedWhereOptions } = {}): Promise<number> {
+      const { paranoid = false } = options;
+      const { where } = countOptions;
+
+      let sql = `SELECT COUNT(*) as count FROM ${tableName}`;
+      const whereClauses: string[] = [];
+      const values: SQLInputValue[] = [];
+
+      if (paranoid) {
+        whereClauses.push('deletedAt IS NULL');
+      }
+
+      if (where) {
+        whereClauses.push(parseWhere(where, values));
+      }
+
+      if (whereClauses.length) {
+        sql += ` WHERE ${whereClauses.join(' AND ')}`;
+      }
+
+      const stmt = db.prepare(sql);
+      const result = stmt.get(...values) as { count: number };
+      return result.count;
+    }
+
+    static async sum(field: string, options: { where?: ExtendedWhereOptions } = {}): Promise<number> {
+      return this._aggregate('SUM', field, options);
+    }
+
+    static async min(field: string, options: { where?: ExtendedWhereOptions } = {}): Promise<number> {
+      return this._aggregate('MIN', field, options);
+    }
+
+    static async max(field: string, options: { where?: ExtendedWhereOptions } = {}): Promise<number> {
+      return this._aggregate('MAX', field, options);
+    }
+
+    static async average(field: string, options: { where?: ExtendedWhereOptions } = {}): Promise<number> {
+      return this._aggregate('AVG', field, options);
+    }
+
+    static async _aggregate(
+      fnName: string,
+      field: string,
+      Opts: { where?: ExtendedWhereOptions } = {}
+    ): Promise<number> {
+      const { paranoid = false } = options;
+      const { where } = Opts;
+
+      const fieldDef = schema[field];
+      if (!fieldDef) throw new Error(`Field ${field} not found in schema`);
+
+      const column = fieldDef.field ?? field;
+      let sql = `SELECT ${fnName}(${column}) as value FROM ${tableName}`;
+      const whereClauses: string[] = [];
+      const values: SQLInputValue[] = [];
+
+      if (paranoid) {
+        whereClauses.push('deletedAt IS NULL');
+      }
+
+      if (where) {
+        whereClauses.push(parseWhere(where, values));
+      }
+
+      if (whereClauses.length) {
+        sql += ` WHERE ${whereClauses.join(' AND ')}`;
+      }
+
+      const stmt = db.prepare(sql);
+      const result = stmt.get(...values) as { value: number | null };
+      return result.value ?? 0;
+    }
+
+    // Bulk operations
+    static async bulkCreate(
+      records: CreationAttributes<typeof schema, typeof options>[],
+      bulkCreateOpts: { ignoreDuplicates?: boolean } = {}
+    ): Promise<Record<string, SQLInputValue>[]> {
+      const { timestamps = true, paranoid = false, underscored = false } = options;
+      const { ignoreDuplicates = false } = bulkCreateOpts;
+
+      if (!records.length) return [];
+
+      const now = Date.now();
+      const insertedRecords: Record<string, SQLInputValue>[] = [];
+
+      // Prepare a single insert statement for all records
+      const firstRecord = records[0];
+      const keys = Object.keys(schema).filter(
+        (key) =>
+          !schema[key].isVirtual &&
+          !(schema[key].autoIncrement && !firstRecord[key]) &&
+          !(schema[key].generatedAs && !firstRecord[key])
+      );
+
+      const mappedKeys = keys.map((key) =>
+        schema[key].field ?? (underscored ? key.replace(/([A-Z])/g, '_$1').toLowerCase() : key)
+      );
+
+      if (timestamps) {
+        mappedKeys.push('createdAt', 'updatedAt');
+      }
+      if (paranoid) {
+        mappedKeys.push('deletedAt');
+      }
+
+      const placeholders = records.map(() => `(${mappedKeys.map(() => '?').join(', ')})`).join(', ');
+      const values: SQLInputValue[] = [];
+
+      for (const record of records) {
+        const insertData: Record<string, SQLInputValue> = { ...record };
+
+        if (timestamps) {
+          insertData.createdAt = insertData.createdAt ?? now;
+          insertData.updatedAt = insertData.updatedAt ?? now;
+        }
+        if (paranoid) {
+          insertData.deletedAt = insertData.deletedAt ?? null;
+        }
+
+        for (const key of keys) {
+          const field = schema[key];
+          if (!(key in insertData) || insertData[key] == null) {
+            const raw = field.defaultFn?.() ?? field.defaultValue;
+            insertData[key] = isSQLInputValue(raw) ? raw : null;
+          }
+
+          if (key in insertData && insertData[key] != null) {
+            if (field.transform) {
+              insertData[key] = field.transform(insertData[key]) as SQLInputValue;
+            }
+            if (field.set) {
+              field.set(insertData[key], {
+                value: (v) => (insertData[key] = v as SQLInputValue),
+              });
+            }
+          }
+        }
+
+        values.push(
+          ...mappedKeys.map((key) => {
+            const originalKey = key.replace(/_[a-z]/g, (m) => m[1].toUpperCase());
+            return insertData[originalKey];
+          })
+        );
+      }
+
+      const onConflict = ignoreDuplicates ? 'ON CONFLICT DO NOTHING' : '';
+      const sql = `INSERT ${onConflict} INTO ${tableName} (${mappedKeys.join(
+        ', '
+      )}) VALUES ${placeholders} RETURNING *`;
+
+      try {
+        const stmt = db.prepare(sql);
+        const result = stmt.all(...values) as Record<string, SQLInputValue>[];
+        insertedRecords.push(...result);
+      } catch (error) {
+        if (ignoreDuplicates && error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+          // Some records may have been inserted, we just ignore the error
+        } else {
+          throw error;
+        }
+      }
+
+      return insertedRecords;
+    }
+
+    static async increment(
+      fields: Record<string, number>,
+      Opts: { where: ExtendedWhereOptions; by?: number }
+    ): Promise<void> {
+      const { where, by = 1 } = Opts;
+      const updates: string[] = [];
+      const values: SQLInputValue[] = [];
+
+      for (const [field, amount] of Object.entries(fields)) {
+        const fieldDef = schema[field];
+        if (!fieldDef) throw new Error(`Field ${field} not found in schema`);
+        if (!fieldDef.type || ![DataType.INTEGER, DataType.BIGINT, DataType.FLOAT].includes(fieldDef.type)) {
+          throw new Error(`Field ${field} is not numeric and cannot be incremented`);
+        }
+
+        const column = fieldDef.field ?? field;
+        updates.push(`${column} = ${column} + ?`);
+        values.push(amount * by);
+      }
+
+      const whereClauses: string[] = [];
+      const whereStr = parseWhere(where, values);
+      if (whereStr) whereClauses.push(whereStr);
+
+      if (options.paranoid) {
+        whereClauses.push('deletedAt IS NULL');
+      }
+
+      const sql = `UPDATE ${tableName} SET ${updates.join(', ')} WHERE ${whereClauses.join(' AND ')}`;
+      db.prepare(sql).run(...values);
+    }
+
+    static async decrement(
+      fields: Record<string, number>,
+      options: { where: ExtendedWhereOptions; by?: number }
+    ): Promise<void> {
+      await this.increment(
+        Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, -v])),
+        options
+      );
+    }
+
+    // Other utility methods
+    static async findOrCreate(opts: {
+      where: ExtendedWhereOptions;
+      extras: CreationAttributes<typeof schema, typeof options>;
+    }): Promise<[Record<string, SQLInputValue>, boolean]> {
+      const existing = await this.findOne({ where: opts.where });
+      if (existing) {
+        return [existing, false];
+      }
+
+      const created = await this.create({
+        ...opts.extras,
+        ...opts.where,
+      });
+      return [created, true];
+    }
+
+    static async restore(restoreOptions: { where: ExtendedWhereOptions }): Promise<number | unknown> {
+      if (!options.paranoid) {
+        throw new Error('Cannot restore records when paranoid mode is disabled');
+      }
+
+      return this.update({ deletedAt: null }, { where: restoreOptions.where });
     }
   }
 }
