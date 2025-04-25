@@ -5,7 +5,7 @@ import type { DatabaseOptions, ModelOptions, Schema } from './types.js';
 import { setupDatabase } from './hooks.js';
 
 export default class Database {
-  #db: DatabaseSync;
+  db: DatabaseSync;
 
   constructor(location: string | ':memory:', options: DatabaseOptions = {}) {
     const {
@@ -19,7 +19,7 @@ export default class Database {
       ...otherOptions
     } = options;
 
-    this.#db = new DatabaseSync(location, {
+    this.db = new DatabaseSync(location, {
       open,
       enableForeignKeyConstraints,
       enableDoubleQuotedStringLiterals,
@@ -28,21 +28,24 @@ export default class Database {
       ...otherOptions,
     });
 
-    setupDatabase(this.#db, { journalMode, busyTimeout });
+    setupDatabase(this.db, { journalMode, busyTimeout });
   }
 
   define(tableName: string, schema: Schema, options: ModelOptions = {}) {
-    return model(this.#db, tableName, schema, options);
+    return model(this.db, tableName, schema, options);
   }
 
-  static async exec(query: string): Promise<unknown> {
-    return Promise.resolve(this.exec(query))
+  exec(sql: string) {
+    return this.db.exec(sql)
   }
 
-  static async prepare(query: string): Promise<unknown> {
-    return Promise.resolve(this.prepare(query))
+  prepare(sql: string) {
+    return this.db.prepare(sql)
   }
 
+  close() {
+    return this.db.close()
+  }
 }
 export * from './functions.js'
 export * from './types.js'

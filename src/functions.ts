@@ -80,6 +80,15 @@ export function model(db: DatabaseSync, tableName: string, schema: Schema, optio
   setupTable(db, tableName, schema, options);
 
   return class Model {
+
+    static async exec(query: string): Promise<unknown> {
+      return Promise.resolve(db.exec(query))
+    }
+
+    static async prepare(query: string): Promise<unknown> {
+      return Promise.resolve(db.prepare(query))
+    }
+
     static async create(data: CreationAttributes<typeof schema, typeof options>): Promise<Record<string, SQLInputValue>> {
       const { timestamps = true, paranoid = false, underscored = false } = options;
       const insertData: Record<string, SQLInputValue> = { ...data };
