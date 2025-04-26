@@ -37,6 +37,8 @@ export enum DataType {
   ENUM = 'TEXT',
 }
 
+export type ORMInputValue = string | number | NodeJS.ArrayBufferView | object | null | undefined
+
 /** Field-level validator */
 export type Validator = (value: unknown) => boolean | Promise<boolean>;
 
