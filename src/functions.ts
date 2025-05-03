@@ -1,5 +1,5 @@
-import { DatabaseSync } from "node:sqlite";
-import { setupTable } from "./hooks.js";
+import { DatabaseSync } from 'node:sqlite';
+import { setupTable } from './hooks.js';
 import {
  DataType,
  type Schema,
@@ -9,7 +9,7 @@ import {
  type ExtendedWhereOptions,
  type ORMInputValue,
  type FieldDefinition,
-} from "./types.js";
+} from './types.js';
 import {
  parseWhere,
  validateField,
@@ -21,7 +21,7 @@ import {
  toSQLInputValue,
  normalizeToOrmInput,
  Op,
-} from "./tools.js";
+} from './tools.js';
 
 export function model(
  db: DatabaseSync,
@@ -52,7 +52,7 @@ export function model(
     }
 
     if (insertData[field] === undefined) {
-     if (typeof def.defaultFn === "function") {
+     if (typeof def.defaultFn === 'function') {
       const defaultValue = def.defaultFn();
       insertData[field] = normalizeToOrmInput(defaultValue);
      } else if (def.defaultValue !== undefined) {
@@ -61,13 +61,13 @@ export function model(
     }
 
     if (insertData[field] !== undefined) {
-     if (typeof def.set === "function") {
+     if (typeof def.set === 'function') {
       let finalValue: unknown = insertData[field];
       def.set(finalValue, { value: (v: unknown) => (finalValue = v) });
       insertData[field] = normalizeToOrmInput(finalValue);
      }
 
-     if (typeof def.transform === "function") {
+     if (typeof def.transform === 'function') {
       insertData[field] = normalizeToOrmInput(def.transform(insertData[field]));
      }
 
@@ -106,13 +106,13 @@ export function model(
 
     if (
      insertData[field] &&
-     typeof insertData[field] === "object" &&
+     typeof insertData[field] === 'object' &&
      !Array.isArray(insertData[field])
     ) {
      operatorKeys.forEach((op) => {
       if (
        insertData[field] &&
-       typeof insertData[field] === "object" &&
+       typeof insertData[field] === 'object' &&
        op in insertData[field]
       ) {
        const operator = (insertData[field] as Record<string, unknown>)[op];
@@ -145,12 +145,12 @@ export function model(
     await Promise.all(modelValidations);
    }
 
-   if (typeof options.hooks?.beforeCreate === "function") {
+   if (typeof options.hooks?.beforeCreate === 'function') {
     await options.hooks.beforeCreate(insertData);
    }
 
    const keys = Object.keys(insertData);
-   const placeholders = keys.map(() => "?").join(", ");
+   const placeholders = keys.map(() => '?').join(', ');
    const values = keys
     .map((key) =>
      handleSQLFunction(insertData[key], key, options.underscored ?? false),
@@ -158,7 +158,7 @@ export function model(
     .map(toSQLInputValue);
 
    const sql = `INSERT INTO ${tableName} (${keys.join(
-    ", ",
+    ', ',
    )}) VALUES (${placeholders}) RETURNING *`;
 
    const stmt = db.prepare(sql);
@@ -169,7 +169,7 @@ export function model(
    for (const [field, definition] of Object.entries(schema)) {
     const def = definition as FieldDefinition;
 
-    if (typeof def.get === "function" && finalResult[field] !== undefined) {
+    if (typeof def.get === 'function' && finalResult[field] !== undefined) {
      const getterValue = def.get.call(finalResult);
      finalResult[field] = normalizeToOrmInput(getterValue);
     }
@@ -179,7 +179,7 @@ export function model(
     }
    }
 
-   if (typeof options.hooks?.afterCreate === "function") {
+   if (typeof options.hooks?.afterCreate === 'function') {
     await options.hooks.afterCreate(finalResult);
    }
 
@@ -207,16 +207,16 @@ export function model(
      schema[k]?.field ??
      (underscored
       ? String(k)
-         .replace(/([A-Z])/g, "_$1")
+         .replace(/([A-Z])/g, '_$1')
          .toLowerCase()
       : k),
    );
-   if (timestamps && !attributes) selectFields.push("createdAt", "updatedAt");
-   if (paranoid && !attributes) selectFields.push("deletedAt");
+   if (timestamps && !attributes) selectFields.push('createdAt', 'updatedAt');
+   if (paranoid && !attributes) selectFields.push('deletedAt');
 
    let sql = `SELECT ${selectFields
     .map((f) => `${tableName}.${f}`)
-    .join(", ")} FROM ${tableName}`;
+    .join(', ')} FROM ${tableName}`;
    const joins: string[] = [];
    const values: ORMInputValue[] = [];
 
@@ -227,7 +227,7 @@ export function model(
      (f) => f.references?.model === relatedTable,
     );
     if (!ref) throw new Error(`No reference found for ${relatedTable}`);
-    const joinType = inc.required ? "INNER JOIN" : "LEFT JOIN";
+    const joinType = inc.required ? 'INNER JOIN' : 'LEFT JOIN';
     joins.push(
      `${joinType} ${relatedTable} AS ${alias} ON ${tableName}.${
       ref.field || ref.references?.key
@@ -239,14 +239,14 @@ export function model(
    if (paranoid) whereClauses.push(`${tableName}.deletedAt IS NULL`);
 
    if (where) whereClauses.push(parseWhere(where, values));
-   if (whereClauses.length) sql += ` WHERE ${whereClauses.join(" AND ")}`;
-   if (joins.length) sql += ` ${joins.join(" ")}`;
+   if (whereClauses.length) sql += ` WHERE ${whereClauses.join(' AND ')}`;
+   if (joins.length) sql += ` ${joins.join(' ')}`;
    if (groupBy)
-    sql += ` GROUP BY ${Array.isArray(groupBy) ? groupBy.join(", ") : groupBy}`;
+    sql += ` GROUP BY ${Array.isArray(groupBy) ? groupBy.join(', ') : groupBy}`;
    if (order)
     sql += ` ORDER BY ${order
      .map((o) => (Array.isArray(o) ? `${o[0]} ${o[1]}` : o))
-     .join(", ")}`;
+     .join(', ')}`;
    if (limit) sql += ` LIMIT ${limit}`;
    if (offset) sql += ` OFFSET ${offset}`;
 
@@ -263,7 +263,7 @@ export function model(
    const primaryKey = Object.entries(schema).find(
     ([_, field]) => field.primaryKey,
    );
-   if (!primaryKey) throw new Error("No primary key defined in schema.");
+   if (!primaryKey) throw new Error('No primary key defined in schema.');
 
    const [pkField, pkDef] = primaryKey;
    const column = pkDef.field ?? pkField;
@@ -300,20 +300,20 @@ export function model(
     if (fieldDef.type === DataType.JSON) {
      const col =
       fieldDef.field ??
-      (underscored ? key.replace(/([A-Z])/g, "_$1").toLowerCase() : key);
+      (underscored ? key.replace(/([A-Z])/g, '_$1').toLowerCase() : key);
      updates.push(`${col} = ?`);
      updateValues.push(JSON.stringify(value));
      continue;
     }
 
     const fnResult = handleSQLFunction(value!, key, underscored);
-    if (typeof fnResult === "string") {
+    if (typeof fnResult === 'string') {
      const col =
       fieldDef.field ??
-      (underscored ? key.replace(/([A-Z])/g, "_$1").toLowerCase() : key);
+      (underscored ? key.replace(/([A-Z])/g, '_$1').toLowerCase() : key);
      updates.push(`${col} = ${fnResult}`);
     } else {
-     let val: ORMInputValue = value ?? "";
+     let val: ORMInputValue = value ?? '';
      val = transformField(val, fieldDef, (v: unknown) => {
       val = v as ORMInputValue;
      });
@@ -321,18 +321,18 @@ export function model(
 
      const col =
       fieldDef.field ??
-      (underscored ? key.replace(/([A-Z])/g, "_$1").toLowerCase() : key);
+      (underscored ? key.replace(/([A-Z])/g, '_$1').toLowerCase() : key);
      updates.push(`${col} = ?`);
      updateValues.push(val);
     }
    }
 
-   if (timestamps && !("updatedAt" in values)) {
+   if (timestamps && !('updatedAt' in values)) {
     updates.push(`updatedAt = ?`);
     updateValues.push(Date.now());
    }
 
-   if (!updates.length) throw new Error("No valid fields provided for update");
+   if (!updates.length) throw new Error('No valid fields provided for update');
 
    const whereClauseParts: string[] = [];
    const whereValues: ORMInputValue[] = [];
@@ -343,10 +343,11 @@ export function model(
    if (whereStr) whereClauseParts.push(whereStr);
 
    const sql = `UPDATE ${tableName} SET ${updates.join(
-    ", ",
-   )} WHERE ${whereClauseParts.join(" AND ")}`;
+    ', ',
+   )} WHERE ${whereClauseParts.join(' AND ')}`;
 
    const stmt = db.prepare(sql);
+
    const result = stmt.run(
     ...updateValues.map(toSQLInputValue),
     ...whereValues.map(toSQLInputValue),
@@ -377,7 +378,7 @@ export function model(
      lookupWhere[uniqueKey[0]] = values[uniqueKey[0]];
     } else {
      throw new Error(
-      "Upsert requires a where clause or a value for primary/unique key",
+      'Upsert requires a where clause or a value for primary/unique key',
      );
     }
    }
@@ -427,9 +428,9 @@ export function model(
    const whereStr = parseWhere(where, values);
    if (whereStr) whereClauses.push(whereStr);
 
-   if (paranoid) whereClauses.push("deletedAt IS NOT NULL");
+   if (paranoid) whereClauses.push('deletedAt IS NOT NULL');
 
-   const sql = `DELETE FROM ${tableName} WHERE ${whereClauses.join(" AND ")}`;
+   const sql = `DELETE FROM ${tableName} WHERE ${whereClauses.join(' AND ')}`;
    const stmt = db.prepare(sql);
    const result = stmt.run(...values.map(toSQLInputValue));
    return result.changes as number;
@@ -456,10 +457,10 @@ export function model(
    const whereClauses: string[] = [];
    const values: ORMInputValue[] = [];
 
-   if (paranoid) whereClauses.push("deletedAt IS NULL");
+   if (paranoid) whereClauses.push('deletedAt IS NULL');
    if (where) whereClauses.push(parseWhere(where, values));
 
-   if (whereClauses.length) sql += ` WHERE ${whereClauses.join(" AND ")}`;
+   if (whereClauses.length) sql += ` WHERE ${whereClauses.join(' AND ')}`;
 
    const stmt = db.prepare(sql);
    const result = stmt.get(...values.map(toSQLInputValue)) as { count: number };
@@ -470,28 +471,28 @@ export function model(
    field: string,
    options: { where?: ExtendedWhereOptions } = {},
   ): Promise<number> {
-   return this._aggregate("SUM", field, options);
+   return this._aggregate('SUM', field, options);
   }
 
   static async min(
    field: string,
    options: { where?: ExtendedWhereOptions } = {},
   ): Promise<number> {
-   return this._aggregate("MIN", field, options);
+   return this._aggregate('MIN', field, options);
   }
 
   static async max(
    field: string,
    options: { where?: ExtendedWhereOptions } = {},
   ): Promise<number> {
-   return this._aggregate("MAX", field, options);
+   return this._aggregate('MAX', field, options);
   }
 
   static async average(
    field: string,
    options: { where?: ExtendedWhereOptions } = {},
   ): Promise<number> {
-   return this._aggregate("AVG", field, options);
+   return this._aggregate('AVG', field, options);
   }
 
   static async _aggregate(
@@ -510,10 +511,10 @@ export function model(
    const whereClauses: string[] = [];
    const values: ORMInputValue[] = [];
 
-   if (paranoid) whereClauses.push("deletedAt IS NULL");
+   if (paranoid) whereClauses.push('deletedAt IS NULL');
    if (where) whereClauses.push(parseWhere(where, values));
 
-   if (whereClauses.length) sql += ` WHERE ${whereClauses.join(" AND ")}`;
+   if (whereClauses.length) sql += ` WHERE ${whereClauses.join(' AND ')}`;
 
    const stmt = db.prepare(sql);
    const result = stmt.get(...values.map(toSQLInputValue)) as {
@@ -548,7 +549,7 @@ export function model(
       Object.keys(schema)
        .filter((key) => schema[key]?.unique)
        .map((key) => record[key])
-       .join("|"),
+       .join('|'),
      );
      if (seen.has(key)) return false;
      seen.add(key);
@@ -569,12 +570,12 @@ export function model(
    );
 
    const mappedKeys = mapKeys(schema, options, keys);
-   if (timestamps) mappedKeys.push("createdAt", "updatedAt");
-   if (paranoid) mappedKeys.push("deletedAt");
+   if (timestamps) mappedKeys.push('createdAt', 'updatedAt');
+   if (paranoid) mappedKeys.push('deletedAt');
 
    const placeholders = dedupedRecords
-    .map(() => `(${mappedKeys.map(() => "?").join(", ")})`)
-    .join(", ");
+    .map(() => `(${mappedKeys.map(() => '?').join(', ')})`)
+    .join(', ');
    const values: ORMInputValue[] = [];
 
    for (const record of dedupedRecords) {
@@ -594,7 +595,7 @@ export function model(
    }
 
    const sql = `INSERT INTO ${tableName} (${mappedKeys.join(
-    ", ",
+    ', ',
    )}) VALUES ${placeholders} RETURNING *`;
 
    try {
@@ -640,11 +641,11 @@ export function model(
    const whereStr = parseWhere(where, values);
    if (whereStr) whereClauses.push(whereStr);
 
-   if (options.paranoid) whereClauses.push("deletedAt IS NULL");
+   if (options.paranoid) whereClauses.push('deletedAt IS NULL');
 
    const sql = `UPDATE ${tableName} SET ${updates.join(
-    ", ",
-   )} WHERE ${whereClauses.join(" AND ")}`;
+    ', ',
+   )} WHERE ${whereClauses.join(' AND ')}`;
    db.prepare(sql).run(...values.map(toSQLInputValue));
   }
 
@@ -673,7 +674,7 @@ export function model(
    where: ExtendedWhereOptions;
   }): Promise<number | unknown> {
    if (!options.paranoid)
-    throw new Error("Cannot restore records when paranoid mode is disabled");
+    throw new Error('Cannot restore records when paranoid mode is disabled');
    return this.update({ deletedAt: null }, { where: restoreOptions.where });
   }
  };
