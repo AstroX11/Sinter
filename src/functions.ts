@@ -297,20 +297,22 @@ export function model(
     const fieldDef = schema[key];
     if (!fieldDef || fieldDef.isVirtual || fieldDef.readOnly) continue;
 
+    const col =
+     fieldDef.field ??
+     (underscored ? key.replace(/([A-Z])/g, '_$1').toLowerCase() : key);
+
     if (fieldDef.type === DataType.JSON) {
-     const col =
-      fieldDef.field ??
-      (underscored ? key.replace(/([A-Z])/g, '_$1').toLowerCase() : key);
      updates.push(`${col} = ?`);
      updateValues.push(JSON.stringify(value));
      continue;
     }
 
     const fnResult = handleSQLFunction(value!, key, underscored);
-    if (typeof fnResult === 'string') {
-     const col =
-      fieldDef.field ??
-      (underscored ? key.replace(/([A-Z])/g, '_$1').toLowerCase() : key);
+
+    if (
+     typeof fnResult === 'string' &&
+     /^\w+\s*\(.*\)$/.test(fnResult.trim())
+    ) {
      updates.push(`${col} = ${fnResult}`);
     } else {
      let val: ORMInputValue = value ?? '';
@@ -318,10 +320,6 @@ export function model(
       val = v as ORMInputValue;
      });
      validateField(val, fieldDef, key);
-
-     const col =
-      fieldDef.field ??
-      (underscored ? key.replace(/([A-Z])/g, '_$1').toLowerCase() : key);
      updates.push(`${col} = ?`);
      updateValues.push(val);
     }
@@ -347,7 +345,6 @@ export function model(
    )} WHERE ${whereClauseParts.join(' AND ')}`;
 
    const stmt = db.prepare(sql);
-
    const result = stmt.run(
     ...updateValues.map(toSQLInputValue),
     ...whereValues.map(toSQLInputValue),
