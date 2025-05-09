@@ -5,11 +5,85 @@ import {
  type ModelOptions,
  type FieldDefinition,
 } from './types.js';
-import { escapeSQLiteValue } from './tools.js';
+
+export function escapeSQLiteValue(value: unknown): string {
+ if (typeof value === 'string') {
+  return `'${value.replace(/'/g, "''")}'`;
+ } else if (typeof value === 'number') {
+  return value.toString();
+ } else if (typeof value === 'boolean') {
+  return value ? '1' : '0';
+ } else if (value === null) {
+  return 'NULL';
+ } else {
+  throw new Error(`Unsupported default value type: ${typeof value}`);
+ }
+}
+
+const SQLITE_RESERVED_KEYWORDS = new Set([
+ 'from',
+ 'select',
+ 'where',
+ 'insert',
+ 'update',
+ 'delete',
+ 'create',
+ 'table',
+ 'index',
+ 'trigger',
+ 'view',
+ 'on',
+ 'as',
+ 'and',
+ 'or',
+ 'not',
+ 'null',
+ 'is',
+ 'in',
+ 'between',
+ 'like',
+ 'group',
+ 'by',
+ 'having',
+ 'order',
+ 'join',
+ 'inner',
+ 'outer',
+ 'left',
+ 'right',
+ 'full',
+ 'union',
+ 'all',
+ 'distinct',
+ 'with',
+ 'case',
+ 'when',
+ 'then',
+ 'else',
+ 'end',
+ 'cast',
+ 'constraint',
+ 'primary',
+ 'key',
+ 'foreign',
+ 'references',
+ 'check',
+ 'default',
+ 'alter',
+ 'drop',
+ 'add',
+ 'set',
+ 'values',
+ 'into',
+ 'begin',
+ 'commit',
+ 'rollback',
+ 'transaction',
+]);
 
 export function setupDatabase(
  db: DatabaseSync,
- options: { journalMode: JournalMode; busyTimeout?: number },
+ options: { journalMode: JournalMode; busyTimeout?: number }
 ) {
  db.exec(`PRAGMA journal_mode = ${options.journalMode}`);
  if (options.busyTimeout !== undefined) {
@@ -21,7 +95,7 @@ export function setupTable(
  db: DatabaseSync,
  tableName: string,
  schema: Schema,
- options: ModelOptions,
+ options: ModelOptions
 ) {
  const {
   timestamps = true,
@@ -93,9 +167,17 @@ export function setupTable(
    });
   }
 
-  let columnDef = `${columnName} ${type}`;
+  const escapedColumnName = SQLITE_RESERVED_KEYWORDS.has(
+   columnName.toLowerCase()
+  )
+   ? `"${columnName}"`
+   : columnName;
+
+  let columnDef = `${escapedColumnName} ${type}`;
   if (generatedAs) {
-   columnDef += ` GENERATED ALWAYS AS (${generatedAs}) ${stored ? 'STORED' : 'VIRTUAL'}`;
+   columnDef += ` GENERATED ALWAYS AS (${generatedAs}) ${
+    stored ? 'STORED' : 'VIRTUAL'
+   }`;
   } else {
    if (primaryKey) columnDef += ' PRIMARY KEY';
    if (autoIncrement) columnDef += ' AUTOINCREMENT';
@@ -132,14 +214,22 @@ export function setupTable(
   columns.push(`CHECK (${constraint})`);
  }
 
- const createTableStmt = `CREATE TABLE IF NOT EXISTS ${actualTableName} (${columns.join(', ')})`;
+ const createTableStmt = `CREATE TABLE IF NOT EXISTS ${actualTableName} (${columns.join(
+  ', '
+ )})`;
  db.exec(createTableStmt);
 
  for (const { fieldName, indexName } of autoIndexedFields) {
-  const defaultIndexName = `idx_${actualTableName}_${fieldName.replace(/\W+/g, '_')}`;
+  const escapedFieldName = SQLITE_RESERVED_KEYWORDS.has(fieldName.toLowerCase())
+   ? `"${fieldName}"`
+   : fieldName;
+  const defaultIndexName = `idx_${actualTableName}_${fieldName.replace(
+   /\W+/g,
+   '_'
+  )}`;
   const actualIndexName = indexName || defaultIndexName;
 
-  const indexStmt = `CREATE INDEX IF NOT EXISTS ${actualIndexName} ON ${actualTableName} (${fieldName})`;
+  const indexStmt = `CREATE INDEX IF NOT EXISTS ${actualIndexName} ON ${actualTableName} (${escapedFieldName})`;
   db.exec(indexStmt);
  }
 
@@ -156,11 +246,15 @@ export function setupTable(
  } of indexes) {
   const indexName =
    name ||
-   `idx_${actualTableName}_${fields.map((f) => f.replace(/\W+/g, '_')).join('_')}`;
+   `idx_${actualTableName}_${fields
+    .map((f) => f.replace(/\W+/g, '_'))
+    .join('_')}`;
 
   const fieldDefs = fields
    .map((field, i) => {
-    let def = field;
+    let def = SQLITE_RESERVED_KEYWORDS.has(field.toLowerCase())
+     ? `"${field}"`
+     : field;
     if (expressionIndex) {
      def = field;
     } else {
@@ -171,7 +265,11 @@ export function setupTable(
    })
    .join(', ');
 
-  let indexStmt = `CREATE ${unique ? 'UNIQUE ' : ''}INDEX ${ifNotExists ? 'IF NOT EXISTS ' : ''}${indexName} ON ${actualTableName} (${fieldDefs})${where ? ` WHERE ${where}` : ''}`;
+  let indexStmt = `CREATE ${unique ? 'UNIQUE ' : ''}INDEX ${
+   ifNotExists ? 'IF NOT EXISTS ' : ''
+  }${indexName} ON ${actualTableName} (${fieldDefs})${
+   where ? ` WHERE ${where}` : ''
+  }`;
 
   if (comment) indexStmt += ` /* ${comment} */`;
 
@@ -189,13 +287,15 @@ export function setupTable(
  }
 
  for (const view of views) {
-  const viewStmt = `CREATE ${view.ifNotExists ? 'VIEW IF NOT EXISTS' : 'VIEW'} ${view.name} AS ${view.sql}`;
+  const viewStmt = `CREATE ${
+   view.ifNotExists ? 'VIEW IF NOT EXISTS' : 'VIEW'
+  } ${view.name} AS ${view.sql}`;
   db.exec(viewStmt);
  }
 
  if (strictMode && withoutRowid) {
   console.warn(
-   `Warning: STRICT and WITHOUT ROWID cannot be used together. Only one will be applied if supported.`,
+   `Warning: STRICT and WITHOUT ROWID cannot be used together. Only one will be applied if supported.`
   );
  }
 }

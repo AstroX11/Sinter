@@ -23,11 +23,78 @@ import {
  Op,
 } from './tools.js';
 
+const SQLITE_RESERVED_KEYWORDS = new Set([
+ 'from',
+ 'select',
+ 'where',
+ 'insert',
+ 'update',
+ 'delete',
+ 'create',
+ 'table',
+ 'index',
+ 'trigger',
+ 'view',
+ 'on',
+ 'as',
+ 'and',
+ 'or',
+ 'not',
+ 'null',
+ 'is',
+ 'in',
+ 'between',
+ 'like',
+ 'group',
+ 'by',
+ 'having',
+ 'order',
+ 'join',
+ 'inner',
+ 'outer',
+ 'left',
+ 'right',
+ 'full',
+ 'union',
+ 'all',
+ 'distinct',
+ 'with',
+ 'case',
+ 'when',
+ 'then',
+ 'else',
+ 'end',
+ 'cast',
+ 'constraint',
+ 'primary',
+ 'key',
+ 'foreign',
+ 'references',
+ 'check',
+ 'default',
+ 'alter',
+ 'drop',
+ 'add',
+ 'set',
+ 'values',
+ 'into',
+ 'begin',
+ 'commit',
+ 'rollback',
+ 'transaction',
+]);
+
+function escapeColumnName(column: string): string {
+ return SQLITE_RESERVED_KEYWORDS.has(column.toLowerCase())
+  ? `"${column}"`
+  : column;
+}
+
 export function model(
  db: DatabaseSync,
  tableName: string,
  schema: Schema,
- options: ModelOptions = {},
+ options: ModelOptions = {}
 ) {
  setupTable(db, tableName, schema, options);
 
@@ -37,7 +104,7 @@ export function model(
   }
 
   static async create(
-   data: CreationAttributes<typeof schema, typeof options>,
+   data: CreationAttributes<typeof schema, typeof options>
   ): Promise<Record<string, ORMInputValue>> {
    const insertData: Record<string, ORMInputValue> = { ...data };
 
@@ -77,10 +144,10 @@ export function model(
         const isValid = await validator(insertData[field]);
         if (!isValid) {
          throw new Error(
-          `Validation failed for field "${field}": ${validatorName}`,
+          `Validation failed for field "${field}": ${validatorName}`
          );
         }
-       },
+       }
       );
       await Promise.all(validations);
      }
@@ -92,7 +159,7 @@ export function model(
      !def.autoIncrement
     ) {
      throw new Error(
-      `Field "${field}" cannot be null and has no default value`,
+      `Field "${field}" cannot be null and has no default value`
      );
     }
    }
@@ -101,7 +168,6 @@ export function model(
 
    for (const [field, definition] of Object.entries(schema)) {
     const def = definition as FieldDefinition;
-
     const operatorKeys = Object.keys(Op);
 
     if (
@@ -118,7 +184,7 @@ export function model(
        const operator = (insertData[field] as Record<string, unknown>)[op];
        insertData[field] = {
         operator,
-        value: (insertData[field] as Record<string, unknown>)[op],
+        value: operator,
        };
       }
      });
@@ -133,6 +199,32 @@ export function model(
     }
    }
 
+   // Check for unique constraints and skip insert entirely if any duplicate exists
+   for (const [field, definition] of Object.entries(schema)) {
+    const def = definition as FieldDefinition;
+    if (def.unique && insertData[field] !== undefined) {
+     const column =
+      def.field ??
+      (options.underscored
+       ? String(field)
+          .replace(/([A-Z])/g, '_$1')
+          .toLowerCase()
+       : String(field));
+     const escaped = escapeColumnName(column);
+     const checkSql = `SELECT 1 FROM ${tableName} WHERE ${escaped} = ? LIMIT 1`;
+     const checkStmt = db.prepare(checkSql);
+     const existing = checkStmt.get(toSQLInputValue(insertData[field]));
+
+     if (existing) {
+      return {}; // Abort insert if any unique constraint is violated
+     }
+    }
+   }
+
+   if (Object.keys(insertData).length === 0) {
+    return {}; // No fields to insert
+   }
+
    if (options.validate) {
     const modelValidations = Object.entries(options.validate).map(
      async ([validatorName, validator]) => {
@@ -140,7 +232,7 @@ export function model(
       if (!isValid) {
        throw new Error(`Model validation failed: ${validatorName}`);
       }
-     },
+     }
     );
     await Promise.all(modelValidations);
    }
@@ -150,17 +242,27 @@ export function model(
    }
 
    const keys = Object.keys(insertData);
+   const escapedKeys = keys.map((key) => {
+    const fieldDef = schema[key] as FieldDefinition;
+    const column =
+     fieldDef?.field ??
+     (options.underscored
+      ? String(key)
+         .replace(/([A-Z])/g, '_$1')
+         .toLowerCase()
+      : String(key));
+    return escapeColumnName(column);
+   });
    const placeholders = keys.map(() => '?').join(', ');
    const values = keys
     .map((key) =>
-     handleSQLFunction(insertData[key], key, options.underscored ?? false),
+     handleSQLFunction(insertData[key], key, options.underscored ?? false)
     )
     .map(toSQLInputValue);
 
-   const sql = `INSERT INTO ${tableName} (${keys.join(
-    ', ',
+   const sql = `INSERT INTO ${tableName} (${escapedKeys.join(
+    ', '
    )}) VALUES (${placeholders}) RETURNING *`;
-
    const stmt = db.prepare(sql);
    const result = stmt.get(...values) as Record<string, ORMInputValue>;
 
@@ -187,7 +289,7 @@ export function model(
   }
 
   static async findAll(
-   query: FindAllOptions<typeof schema, typeof options> = {},
+   query: FindAllOptions<typeof schema, typeof options> = {}
   ): Promise<Record<string, ORMInputValue>[]> {
    const { timestamps = true, paranoid = false, underscored = false } = options;
    const {
@@ -202,17 +304,25 @@ export function model(
 
    const selectFields = (
     attributes ?? Object.keys(schema).filter((k) => !schema[k]!.isVirtual)
-   ).map(
-    (k) =>
-     schema[k]?.field ??
+   ).map((k) => {
+    const fieldDef = schema[k] as FieldDefinition;
+    const column =
+     fieldDef?.field ??
      (underscored
       ? String(k)
          .replace(/([A-Z])/g, '_$1')
          .toLowerCase()
-      : k),
-   );
-   if (timestamps && !attributes) selectFields.push('createdAt', 'updatedAt');
-   if (paranoid && !attributes) selectFields.push('deletedAt');
+      : String(k));
+    return escapeColumnName(column);
+   });
+
+   if (timestamps && !attributes)
+    selectFields.push(
+     escapeColumnName('createdAt'),
+     escapeColumnName('updatedAt')
+    );
+   if (paranoid && !attributes)
+    selectFields.push(escapeColumnName('deletedAt'));
 
    let sql = `SELECT ${selectFields
     .map((f) => `${tableName}.${f}`)
@@ -224,53 +334,64 @@ export function model(
     const relatedTable = inc.model.name;
     const alias = inc.as || relatedTable;
     const ref = Object.values(schema).find(
-     (f) => f.references?.model === relatedTable,
+     (f) => f.references?.model === relatedTable
     );
     if (!ref) throw new Error(`No reference found for ${relatedTable}`);
+    const refField = ref.field || ref.references?.key;
+    const escapedRefField = escapeColumnName(refField!);
+    const escapedRefKey = escapeColumnName(ref.references?.key!);
     const joinType = inc.required ? 'INNER JOIN' : 'LEFT JOIN';
     joins.push(
-     `${joinType} ${relatedTable} AS ${alias} ON ${tableName}.${
-      ref.field || ref.references?.key
-     } = ${alias}.${ref.references?.key}`,
+     `${joinType} ${relatedTable} AS ${alias} ON ${tableName}.${escapedRefField} = ${alias}.${escapedRefKey}`
     );
    });
 
    const whereClauses: string[] = [];
-   if (paranoid) whereClauses.push(`${tableName}.deletedAt IS NULL`);
+   if (paranoid)
+    whereClauses.push(`${tableName}.${escapeColumnName('deletedAt')} IS NULL`);
 
    if (where) whereClauses.push(parseWhere(where, values));
    if (whereClauses.length) sql += ` WHERE ${whereClauses.join(' AND ')}`;
    if (joins.length) sql += ` ${joins.join(' ')}`;
    if (groupBy)
-    sql += ` GROUP BY ${Array.isArray(groupBy) ? groupBy.join(', ') : groupBy}`;
+    sql += ` GROUP BY ${
+     Array.isArray(groupBy)
+      ? groupBy.map(escapeColumnName).join(', ')
+      : escapeColumnName(groupBy)
+    }`;
    if (order)
     sql += ` ORDER BY ${order
-     .map((o) => (Array.isArray(o) ? `${o[0]} ${o[1]}` : o))
+     .map((o) =>
+      Array.isArray(o)
+       ? `${escapeColumnName(o[0])} ${o[1]}`
+       : escapeColumnName(o)
+     )
      .join(', ')}`;
    if (limit) sql += ` LIMIT ${limit}`;
    if (offset) sql += ` OFFSET ${offset}`;
 
    const stmt = db.prepare(sql);
    return JSON.parse(
-    JSON.stringify(stmt.all(...values.map(toSQLInputValue))),
+    JSON.stringify(stmt.all(...values.map(toSQLInputValue)))
    ) as Record<string, ORMInputValue>[];
   }
 
   static async findByPk(
-   id: number | string,
+   id: number | string
   ): Promise<Record<string, ORMInputValue> | undefined> {
    const { paranoid = false } = options;
    const primaryKey = Object.entries(schema).find(
-    ([_, field]) => field.primaryKey,
+    ([_, field]) => field.primaryKey
    );
    if (!primaryKey) throw new Error('No primary key defined in schema.');
 
    const [pkField, pkDef] = primaryKey;
    const column = pkDef.field ?? pkField;
-   let sql = `SELECT * FROM ${tableName} WHERE ${column} = ?`;
+   const escapedColumn = escapeColumnName(column);
+   let sql = `SELECT * FROM ${tableName} WHERE ${escapedColumn} = ?`;
    const values = [id];
 
-   if (paranoid) sql += ` AND deletedAt IS NULL`;
+   if (paranoid) sql += ` AND ${escapeColumnName('deletedAt')} IS NULL`;
 
    const stmt = db.prepare(sql);
    return stmt.get(...values.map(toSQLInputValue))
@@ -279,7 +400,7 @@ export function model(
   }
 
   static async findOne(
-   opts: FindAllOptions<typeof schema, typeof options> = {},
+   opts: FindAllOptions<typeof schema, typeof options> = {}
   ): Promise<Record<string, ORMInputValue> | null> {
    const results = await Model.findAll({ ...opts, limit: 1 });
    return results?.[0] ? JSON.parse(JSON.stringify(results[0])) : null;
@@ -287,7 +408,7 @@ export function model(
 
   static async update(
    values: Partial<Record<string, ORMInputValue>>,
-   opts: { where: ExtendedWhereOptions },
+   opts: { where: ExtendedWhereOptions }
   ): Promise<{ changes: number | bigint }> {
    const { timestamps = true, paranoid = false, underscored = false } = options;
    const updates: string[] = [];
@@ -300,9 +421,10 @@ export function model(
     const col =
      fieldDef.field ??
      (underscored ? key.replace(/([A-Z])/g, '_$1').toLowerCase() : key);
+    const escapedCol = escapeColumnName(col);
 
     if (fieldDef.type === DataType.JSON) {
-     updates.push(`${col} = ?`);
+     updates.push(`${escapedCol} = ?`);
      updateValues.push(JSON.stringify(value));
      continue;
     }
@@ -313,20 +435,20 @@ export function model(
      typeof fnResult === 'string' &&
      /^\w+\s*\(.*\)$/.test(fnResult.trim())
     ) {
-     updates.push(`${col} = ${fnResult}`);
+     updates.push(`${escapedCol} = ${fnResult}`);
     } else {
      let val: ORMInputValue = value ?? '';
      val = transformField(val, fieldDef, (v: unknown) => {
       val = v as ORMInputValue;
      });
      validateField(val, fieldDef, key);
-     updates.push(`${col} = ?`);
+     updates.push(`${escapedCol} = ?`);
      updateValues.push(val);
     }
    }
 
    if (timestamps && !('updatedAt' in values)) {
-    updates.push(`updatedAt = ?`);
+    updates.push(`${escapeColumnName('updatedAt')} = ?`);
     updateValues.push(Date.now());
    }
 
@@ -335,19 +457,22 @@ export function model(
    const whereClauseParts: string[] = [];
    const whereValues: ORMInputValue[] = [];
 
-   if (paranoid) whereClauseParts.push(`${tableName}.deletedAt IS NULL`);
+   if (paranoid)
+    whereClauseParts.push(
+     `${tableName}.${escapeColumnName('deletedAt')} IS NULL`
+    );
 
    const whereStr = parseWhere(opts.where, whereValues);
    if (whereStr) whereClauseParts.push(whereStr);
 
    const sql = `UPDATE ${tableName} SET ${updates.join(
-    ', ',
+    ', '
    )} WHERE ${whereClauseParts.join(' AND ')}`;
 
    const stmt = db.prepare(sql);
    const result = stmt.run(
     ...updateValues.map(toSQLInputValue),
-    ...whereValues.map(toSQLInputValue),
+    ...whereValues.map(toSQLInputValue)
    );
 
    return { changes: result.changes };
@@ -355,7 +480,7 @@ export function model(
 
   static async upsert(
    values: CreationAttributes<typeof schema, typeof options>,
-   opts: { where?: ExtendedWhereOptions } = {},
+   opts: { where?: ExtendedWhereOptions } = {}
   ): Promise<Record<string, ORMInputValue> | null> {
    const processedValues: Record<string, ORMInputValue> = { ...values };
    processTimestampsAndParanoid(processedValues, options);
@@ -365,7 +490,7 @@ export function model(
 
    if (Object.keys(lookupWhere).length === 0) {
     const primaryKey = Object.entries(schema).find(
-     ([_, field]) => field.primaryKey,
+     ([_, field]) => field.primaryKey
     );
     const uniqueKey = Object.entries(schema).find(([_, field]) => field.unique);
 
@@ -375,7 +500,7 @@ export function model(
      lookupWhere[uniqueKey[0]] = values[uniqueKey[0]];
     } else {
      throw new Error(
-      'Upsert requires a where clause or a value for primary/unique key',
+      'Upsert requires a where clause or a value for primary/unique key'
      );
     }
    }
@@ -388,7 +513,7 @@ export function model(
     if (options.timestamps) delete updateValues.createdAt;
 
     const primaryKey = Object.entries(schema).find(
-     ([_, field]) => field.primaryKey,
+     ([_, field]) => field.primaryKey
     );
     if (primaryKey) delete updateValues[primaryKey[0]];
 
@@ -400,7 +525,7 @@ export function model(
    } else {
     try {
      return await this.create(
-      processedValues as CreationAttributes<typeof schema, typeof options>,
+      processedValues as CreationAttributes<typeof schema, typeof options>
      );
     } catch {
      await this.update(processedValues, { where: lookupWhere });
@@ -425,7 +550,8 @@ export function model(
    const whereStr = parseWhere(where, values);
    if (whereStr) whereClauses.push(whereStr);
 
-   if (paranoid) whereClauses.push('deletedAt IS NOT NULL');
+   if (paranoid)
+    whereClauses.push(`${escapeColumnName('deletedAt')} IS NOT NULL`);
 
    const sql = `DELETE FROM ${tableName} WHERE ${whereClauses.join(' AND ')}`;
    const stmt = db.prepare(sql);
@@ -445,7 +571,7 @@ export function model(
   }
 
   static async count(
-   countOptions: { where?: ExtendedWhereOptions } = {},
+   countOptions: { where?: ExtendedWhereOptions } = {}
   ): Promise<number> {
    const { paranoid = false } = options;
    const { where } = countOptions;
@@ -454,7 +580,7 @@ export function model(
    const whereClauses: string[] = [];
    const values: ORMInputValue[] = [];
 
-   if (paranoid) whereClauses.push('deletedAt IS NULL');
+   if (paranoid) whereClauses.push(`${escapeColumnName('deletedAt')} IS NULL`);
    if (where) whereClauses.push(parseWhere(where, values));
 
    if (whereClauses.length) sql += ` WHERE ${whereClauses.join(' AND ')}`;
@@ -466,28 +592,28 @@ export function model(
 
   static async sum(
    field: string,
-   options: { where?: ExtendedWhereOptions } = {},
+   options: { where?: ExtendedWhereOptions } = {}
   ): Promise<number> {
    return this._aggregate('SUM', field, options);
   }
 
   static async min(
    field: string,
-   options: { where?: ExtendedWhereOptions } = {},
+   options: { where?: ExtendedWhereOptions } = {}
   ): Promise<number> {
    return this._aggregate('MIN', field, options);
   }
 
   static async max(
    field: string,
-   options: { where?: ExtendedWhereOptions } = {},
+   options: { where?: ExtendedWhereOptions } = {}
   ): Promise<number> {
    return this._aggregate('MAX', field, options);
   }
 
   static async average(
    field: string,
-   options: { where?: ExtendedWhereOptions } = {},
+   options: { where?: ExtendedWhereOptions } = {}
   ): Promise<number> {
    return this._aggregate('AVG', field, options);
   }
@@ -495,7 +621,7 @@ export function model(
   static async _aggregate(
    fnName: string,
    field: string,
-   opts: { where?: ExtendedWhereOptions } = {},
+   opts: { where?: ExtendedWhereOptions } = {}
   ): Promise<number> {
    const { paranoid = false } = options;
    const { where } = opts;
@@ -504,11 +630,12 @@ export function model(
    if (!fieldDef) throw new Error(`Field ${field} not found in schema`);
 
    const column = fieldDef.field ?? field;
-   let sql = `SELECT ${fnName}(${column}) as value FROM ${tableName}`;
+   const escapedColumn = escapeColumnName(column);
+   let sql = `SELECT ${fnName}(${escapedColumn}) as value FROM ${tableName}`;
    const whereClauses: string[] = [];
    const values: ORMInputValue[] = [];
 
-   if (paranoid) whereClauses.push('deletedAt IS NULL');
+   if (paranoid) whereClauses.push(`${escapeColumnName('deletedAt')} IS NULL`);
    if (where) whereClauses.push(parseWhere(where, values));
 
    if (whereClauses.length) sql += ` WHERE ${whereClauses.join(' AND ')}`;
@@ -522,7 +649,7 @@ export function model(
 
   static async bulkCreate(
    records: CreationAttributes<typeof schema, typeof options>[],
-   bulkCreateOpts: { ignoreDuplicates?: boolean } = {},
+   bulkCreateOpts: { ignoreDuplicates?: boolean } = {}
   ): Promise<Record<string, ORMInputValue>[]> {
    const { timestamps = true, paranoid = false, underscored = false } = options;
    const { ignoreDuplicates = false } = bulkCreateOpts;
@@ -546,7 +673,7 @@ export function model(
       Object.keys(schema)
        .filter((key) => schema[key]?.unique)
        .map((key) => record[key])
-       .join('|'),
+       .join('|')
      );
      if (seen.has(key)) return false;
      seen.add(key);
@@ -556,43 +683,79 @@ export function model(
 
    if (!dedupedRecords.length) return [];
 
+   const validRecords: typeof dedupedRecords = [];
+   for (const record of dedupedRecords) {
+    let hasDuplicate = false;
+    for (const [field, def] of Object.entries(schema)) {
+     if (def.unique && record[field] !== undefined) {
+      const column =
+       def.field ??
+       (underscored
+        ? String(field)
+           .replace(/([A-Z])/g, '_$1')
+           .toLowerCase()
+        : String(field));
+      const escaped = escapeColumnName(column);
+      const checkSql = `SELECT 1 FROM ${tableName} WHERE ${escaped} = ? LIMIT 1`;
+      const checkStmt = db.prepare(checkSql);
+      const exists = checkStmt.get(toSQLInputValue(record[field]));
+      if (exists) {
+       hasDuplicate = true;
+       break;
+      }
+     }
+    }
+    if (!hasDuplicate) {
+     validRecords.push(record);
+    }
+   }
+
+   if (!validRecords.length) return [];
+
    const insertedRecords: Record<string, ORMInputValue>[] = [];
-   const firstRecord = dedupedRecords[0];
+   const firstRecord = validRecords[0];
 
    const keys = Object.keys(schema).filter(
     (key) =>
      !schema[key]?.isVirtual &&
      !(schema[key]?.autoIncrement && !firstRecord?.[key]) &&
-     !(schema[key]?.generatedAs && !firstRecord?.[key]),
+     !(schema[key]?.generatedAs && !firstRecord?.[key])
    );
 
-   const mappedKeys = mapKeys(schema, options, keys);
-   if (timestamps) mappedKeys.push('createdAt', 'updatedAt');
-   if (paranoid) mappedKeys.push('deletedAt');
+   const mappedKeys = mapKeys(schema, options, keys).map(escapeColumnName);
+   if (timestamps)
+    mappedKeys.push(
+     escapeColumnName('createdAt'),
+     escapeColumnName('updatedAt')
+    );
+   if (paranoid) mappedKeys.push(escapeColumnName('deletedAt'));
 
-   const placeholders = dedupedRecords
+   const placeholders = validRecords
     .map(() => `(${mappedKeys.map(() => '?').join(', ')})`)
     .join(', ');
    const values: ORMInputValue[] = [];
 
-   for (const record of dedupedRecords) {
+   for (const record of validRecords) {
     const insertData: Record<string, ORMInputValue> = { ...record };
     processTimestampsAndParanoid(insertData, options);
     processRecordData(schema, insertData, options);
 
     values.push(
-     ...mappedKeys.map((key) =>
-      handleSQLFunction(
-       insertData[key.replace(/_[a-z]/g, (m) => m[1]!.toUpperCase())],
-       key,
-       underscored,
-      ),
-     ),
+     ...keys.map((key) => handleSQLFunction(insertData[key], key, underscored))
     );
+
+    if (timestamps) {
+     const now = Date.now();
+     values.push(now, now);
+    }
+
+    if (paranoid) {
+     values.push(null);
+    }
    }
 
    const sql = `INSERT INTO ${tableName} (${mappedKeys.join(
-    ', ',
+    ', '
    )}) VALUES ${placeholders} RETURNING *`;
 
    try {
@@ -606,12 +769,12 @@ export function model(
     throw error;
    }
 
-   return insertedRecords;
+   return JSON.parse(JSON.stringify(insertedRecords));
   }
 
   static async increment(
    fields: Record<string, number>,
-   opts: { where: ExtendedWhereOptions; by?: number },
+   opts: { where: ExtendedWhereOptions; by?: number }
   ): Promise<void> {
    const { where, by = 1 } = opts;
    const updates: string[] = [];
@@ -623,14 +786,15 @@ export function model(
     if (
      !fieldDef.type ||
      ![DataType.INTEGER, DataType.BIGINT, DataType.FLOAT].includes(
-      fieldDef.type,
+      fieldDef.type
      )
     ) {
      throw new Error(`Field ${field} is not numeric and cannot be incremented`);
     }
 
     const column = fieldDef.field ?? field;
-    updates.push(`${column} = ${column} + ?`);
+    const escapedColumn = escapeColumnName(column);
+    updates.push(`${escapedColumn} = ${escapedColumn} + ?`);
     values.push(amount * by);
    }
 
@@ -638,21 +802,22 @@ export function model(
    const whereStr = parseWhere(where, values);
    if (whereStr) whereClauses.push(whereStr);
 
-   if (options.paranoid) whereClauses.push('deletedAt IS NULL');
+   if (options.paranoid)
+    whereClauses.push(`${escapeColumnName('deletedAt')} IS NULL`);
 
    const sql = `UPDATE ${tableName} SET ${updates.join(
-    ', ',
+    ', '
    )} WHERE ${whereClauses.join(' AND ')}`;
    db.prepare(sql).run(...values.map(toSQLInputValue));
   }
 
   static async decrement(
    fields: Record<string, number>,
-   options: { where: ExtendedWhereOptions; by?: number },
+   options: { where: ExtendedWhereOptions; by?: number }
   ): Promise<void> {
    await this.increment(
     Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, -v])),
-    options,
+    options
    );
   }
 
