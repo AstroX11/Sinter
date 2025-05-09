@@ -39,13 +39,13 @@ export enum DataType {
 
 /** Valid ORM input values */
 export type ORMInputValue =
+ | null
+ | undefined
  | string
  | number
  | boolean
  | NodeJS.ArrayBufferView
- | object
- | null
- | undefined;
+ | object;
 
 /** Field-level validator */
 export type Validator = (value: unknown) => boolean | Promise<boolean>;
@@ -160,17 +160,12 @@ export type DataTypeToTS = {
 /** Valid SQLite input values */
 export type SQLInputValue = string | number | boolean | null | Buffer;
 
-/** Generate CreationAttributes from Schema */
+/** Create attributes shape */
 export type CreationAttributes<S extends Schema, O extends ModelOptions> = {
- [K in keyof S as S[K]['isVirtual'] extends true
-  ? never
-  : K]: S[K]['allowNull'] extends true
-  ? DataTypeToTS[S[K]['type']] | null | undefined
-  : S[K]['autoIncrement'] extends true
-  ? DataTypeToTS[S[K]['type']] | null | undefined
-  : S[K]['generatedAs'] extends string
-  ? DataTypeToTS[S[K]['type']] | null | undefined
-  : DataTypeToTS[S[K]['type']];
+ [K in keyof S as S[K]['isVirtual'] extends true ? never : K]:
+  | DataTypeToTS[S[K]['type']]
+  | null
+  | undefined;
 } & (O['timestamps'] extends true
  ? {
     createdAt?: number | null | undefined;
@@ -182,9 +177,19 @@ export type CreationAttributes<S extends Schema, O extends ModelOptions> = {
 /** Where clause value types */
 export type WhereValue = any | { json?: [string, any]; literal?: string };
 
+export type SQLCompatibleValue =
+ | string
+ | number
+ | boolean
+ | object
+ | Buffer
+ | null
+ | undefined
+ | any;
+
 /** Extended where options for queries */
 export interface ExtendedWhereOptions {
- [key: string]: WhereValue | ExtendedWhereOptions[] | undefined;
+ [key: string]: SQLCompatibleValue | ExtendedWhereOptions[] | undefined;
  or?: ExtendedWhereOptions[];
  and?: ExtendedWhereOptions[];
 }
