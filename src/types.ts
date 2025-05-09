@@ -26,7 +26,7 @@ export enum DataType {
  FLOAT = 'REAL',
  DOUBLE = 'REAL',
  DECIMAL = 'REAL',
- BOOLEAN = 'INTEGER',
+ BOOLEAN = 'BOOLEAN',
  DATE = 'TEXT',
  DATEONLY = 'TEXT',
  TIME = 'TEXT',
@@ -37,9 +37,11 @@ export enum DataType {
  ENUM = 'TEXT',
 }
 
+/** Valid ORM input values */
 export type ORMInputValue =
  | string
  | number
+ | boolean
  | NodeJS.ArrayBufferView
  | object
  | null
@@ -134,6 +136,7 @@ export interface ModelOptions {
  withoutRowid?: boolean;
 }
 
+/** Map DataType to TypeScript types */
 export type DataTypeToTS = {
  [DataType.STRING]: string;
  [DataType.CHAR]: string;
@@ -143,7 +146,7 @@ export type DataTypeToTS = {
  [DataType.FLOAT]: number;
  [DataType.DOUBLE]: number;
  [DataType.DECIMAL]: number;
- [DataType.BOOLEAN]: number;
+ [DataType.BOOLEAN]: boolean;
  [DataType.DATE]: string;
  [DataType.DATEONLY]: string;
  [DataType.TIME]: string;
@@ -154,38 +157,39 @@ export type DataTypeToTS = {
  [DataType.ENUM]: string;
 };
 
-// Valid SQLite input values
+/** Valid SQLite input values */
 export type SQLInputValue = string | number | boolean | null | Buffer;
 
-// Generate CreationAttributes from Schema
+/** Generate CreationAttributes from Schema */
 export type CreationAttributes<S extends Schema, O extends ModelOptions> = {
  [K in keyof S as S[K]['isVirtual'] extends true
   ? never
   : K]: S[K]['allowNull'] extends true
-  ? S[K]['autoIncrement'] extends true
-    ? DataTypeToTS[S[K]['type']] | undefined | null
-    : S[K]['generatedAs'] extends string
-      ? DataTypeToTS[S[K]['type']] | undefined | null
-      : DataTypeToTS[S[K]['type']] | null
+  ? DataTypeToTS[S[K]['type']] | null | undefined
   : S[K]['autoIncrement'] extends true
-    ? DataTypeToTS[S[K]['type']] | undefined | null
-    : S[K]['generatedAs'] extends string
-      ? DataTypeToTS[S[K]['type']] | undefined | null
-      : DataTypeToTS[S[K]['type']] | null;
+  ? DataTypeToTS[S[K]['type']] | null | undefined
+  : S[K]['generatedAs'] extends string
+  ? DataTypeToTS[S[K]['type']] | null | undefined
+  : DataTypeToTS[S[K]['type']];
 } & (O['timestamps'] extends true
- ? { createdAt?: number | null; updatedAt?: number | null }
+ ? {
+    createdAt?: number | null | undefined;
+    updatedAt?: number | null | undefined;
+   }
  : {}) &
- (O['paranoid'] extends true ? { deletedAt?: number | null } : {});
+ (O['paranoid'] extends true ? { deletedAt?: number | null | undefined } : {});
 
-// Add after CreationAttributes
+/** Where clause value types */
 export type WhereValue = any | { json?: [string, any]; literal?: string };
 
+/** Extended where options for queries */
 export interface ExtendedWhereOptions {
  [key: string]: WhereValue | ExtendedWhereOptions[] | undefined;
  or?: ExtendedWhereOptions[];
  and?: ExtendedWhereOptions[];
 }
 
+/** Include options for associations */
 export interface IncludeOptions {
  model: { new (): any };
  as?: string;
@@ -194,10 +198,12 @@ export interface IncludeOptions {
  attributes?: string[];
 }
 
+/** Basic where options */
 export interface WhereOptions {
  [key: string]: any | { json?: [string, any]; literal?: string };
 }
 
+/** FindAll query options */
 export interface FindAllOptions<S extends Schema, O extends ModelOptions> {
  where?: ExtendedWhereOptions;
  include?: IncludeOptions[];

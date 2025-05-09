@@ -3,9 +3,6 @@ import { Database, DataType } from '@astrox11/sqlite';
 const db = new Database(':memory:');
 
 const test = db.define('test', {
- from: {
-  type: DataType.STRING,
-  unique: true,
- },
+ alive: { type: DataType.JSON, allowNull: true },
 });
-console.log(await test.bulkCreate([{ from: '223' }, { from: '223' }]));
+console.log(await test.create({ alive: { id: '1234' } }));
