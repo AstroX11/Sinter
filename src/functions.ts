@@ -109,10 +109,11 @@ export function model(
 						`No association or reference found for ${associationName}`,
 					);
 				}
-				relatedModel = modelRegistry?.get(associationName);
-				if (!relatedModel) {
+				const modelFromRegistry = modelRegistry?.get(associationName);
+				if (!modelFromRegistry) {
 					throw new Error(`Model ${associationName} not registered`);
 				}
+				relatedModel = modelFromRegistry;
 				foreignKey = refField;
 				targetPrimaryKey = schema[refField]?.references?.key || 'id';
 			} else {

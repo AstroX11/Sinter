@@ -231,6 +231,133 @@ export type ModelConstructor = {
 	new (): ModelInstance; // Constructor returns a ModelInstance
 	name: string;
 	schema: Schema;
+	query(query: string): Promise<unknown>;
+	belongsTo(
+		targetModel: ModelConstructor,
+		options: {
+			foreignKey: string;
+			as?: string;
+		},
+	): void;
+	hasMany(
+		targetModel: ModelConstructor,
+		options: {
+			foreignKey: string;
+			as?: string;
+		},
+	): void;
+	getRelated(
+		record: Record<string, ORMInputValue>,
+		associationName: string,
+	): Promise<
+		Record<string, ORMInputValue> | Record<string, ORMInputValue>[] | null
+	>;
+	setRelated(
+		record: Record<string, ORMInputValue>,
+		associationName: string,
+		relatedData:
+			| Record<string, ORMInputValue>
+			| Record<string, ORMInputValue>[]
+			| null,
+	): Promise<void>;
+	setRelated(
+		record: Record<string, ORMInputValue>,
+		associationName: string,
+		relatedData:
+			| Record<string, ORMInputValue>
+			| Record<string, ORMInputValue>[]
+			| null,
+	): Promise<void>;
+	create(
+		data: CreationAttributes<Schema, ModelOptions>,
+	): Promise<Record<string, ORMInputValue>>;
+	findAll(
+		query?: FindAllOptions<Schema, ModelOptions>,
+	): Promise<Record<string, ORMInputValue>[]>;
+	findByPk(
+		id: number | string,
+	): Promise<Record<string, ORMInputValue> | undefined>;
+	findOne(
+		opts?: FindAllOptions<Schema, ModelOptions>,
+	): Promise<Record<string, ORMInputValue> | null>;
+	update(
+		values: Partial<Record<string, ORMInputValue>>,
+		opts: {
+			where: ExtendedWhereOptions;
+		},
+	): Promise<{
+		changes: number | bigint;
+	}>;
+	upsert(
+		values: CreationAttributes<Schema, ModelOptions>,
+		opts?: {
+			where?: ExtendedWhereOptions;
+		},
+	): Promise<Record<string, ORMInputValue> | null>;
+	findOrCreate(opts: {
+		where: ExtendedWhereOptions;
+		extras: CreationAttributes<Schema, ModelOptions>;
+	}): Promise<[Record<string, ORMInputValue>, boolean]>;
+	destroy(destroyOptions: {
+		where: ExtendedWhereOptions;
+		force?: boolean;
+	}): Promise<number | unknown>;
+	truncate({ cascade }?: { cascade?: boolean }): Promise<void>;
+	count(countOptions?: { where?: ExtendedWhereOptions }): Promise<number>;
+	sum(
+		field: string,
+		options?: {
+			where?: ExtendedWhereOptions;
+		},
+	): Promise<number>;
+	min(
+		field: string,
+		options?: {
+			where?: ExtendedWhereOptions;
+		},
+	): Promise<number>;
+	max(
+		field: string,
+		options?: {
+			where?: ExtendedWhereOptions;
+		},
+	): Promise<number>;
+	average(
+		field: string,
+		options?: {
+			where?: ExtendedWhereOptions;
+		},
+	): Promise<number>;
+	_aggregate(
+		fnName: string,
+		field: string,
+		opts?: {
+			where?: ExtendedWhereOptions;
+		},
+	): Promise<number>;
+	bulkCreate(
+		records: CreationAttributes<Schema, ModelOptions>[],
+		bulkCreateOpts?: {
+			ignoreDuplicates?: boolean;
+		},
+	): Promise<Record<string, ORMInputValue>[]>;
+	increment(
+		fields: Record<string, number>,
+		opts: {
+			where: ExtendedWhereOptions;
+			by?: number;
+		},
+	): Promise<void>;
+	decrement(
+		fields: Record<string, number>,
+		options: {
+			where: ExtendedWhereOptions;
+			by?: number;
+		},
+	): Promise<void>;
+	restore(restoreOptions: {
+		where: ExtendedWhereOptions;
+	}): Promise<number | unknown>;
 };
 
 export interface Association {
