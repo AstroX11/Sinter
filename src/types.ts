@@ -228,7 +228,7 @@ export interface ModelInstance {
 }
 
 export type ModelConstructor = {
-	new (): ModelInstance; // Constructor returns a ModelInstance
+	new (): ModelInstance;
 	name: string;
 	schema: Schema;
 	query(query: string): Promise<unknown>;
@@ -302,7 +302,7 @@ export type ModelConstructor = {
 		where: ExtendedWhereOptions;
 		force?: boolean;
 	}): Promise<number | unknown>;
-	truncate({ cascade }?: { cascade?: boolean }): Promise<void>;
+	truncate(options?: { cascade?: boolean }): Promise<void>;
 	count(countOptions?: { where?: ExtendedWhereOptions }): Promise<number>;
 	sum(
 		field: string,
@@ -373,7 +373,6 @@ export interface Association {
 }
 
 export interface IncludeOptions {
-	model: ModelConstructor;
 	as?: string;
 	attributes?: string[];
 	where?: ExtendedWhereOptions;

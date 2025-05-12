@@ -26,6 +26,7 @@ import {
 	Op,
 	SQLITE_RESERVED_KEYWORDS,
 } from './tools.js';
+import { modelRegistry } from './modelRegistry.js';
 
 function escapeColumnName(column: string): string {
 	return SQLITE_RESERVED_KEYWORDS.has(column.toLowerCase())
@@ -38,7 +39,6 @@ export function model(
 	tableName: string,
 	schema: Schema,
 	options: ModelOptions = {},
-	modelRegistry?: Map<string, ModelConstructor>,
 ) {
 	setupTable(db, tableName, schema, options);
 
@@ -142,6 +142,88 @@ export function model(
 			}
 		}
 
+		static async update(
+			values: Partial<Record<string, ORMInputValue>>,
+			opts: { where: ExtendedWhereOptions },
+		): Promise<{ changes: number | bigint }> {
+			const {
+				timestamps = true,
+				paranoid = false,
+				underscored = false,
+			} = options;
+			const updates: string[] = [];
+			const updateValues: ORMInputValue[] = [];
+
+			for (const [key, value] of Object.entries(values)) {
+				const fieldDef = schema[key];
+				if (!fieldDef || fieldDef.isVirtual || fieldDef.readOnly) continue;
+
+				if (value === null && fieldDef.allowNull === false) {
+					throw new Error(
+						`Cannot set ${key} to NULL: field is defined with allowNull: false`,
+					);
+				}
+
+				const col =
+					fieldDef.field ??
+					(underscored ? key.replace(/([A-Z])/g, '_$1').toLowerCase() : key);
+				const escapedCol = escapeColumnName(col);
+
+				if (fieldDef.type === DataType.JSON) {
+					updates.push(`${escapedCol} = ?`);
+					updateValues.push(JSON.stringify(value));
+					continue;
+				}
+
+				const fnResult = handleSQLFunction(value!, key, underscored);
+
+				if (
+					typeof fnResult === 'string' &&
+					/^\w+\s*\(.*\)$/.test(fnResult.trim())
+				) {
+					updates.push(`${escapedCol} = ${fnResult}`);
+				} else {
+					let val: ORMInputValue = value ?? '';
+					val = transformField(val, fieldDef, (v: unknown) => {
+						val = v as ORMInputValue;
+					});
+					validateField(val, fieldDef, key);
+					updates.push(`${escapedCol} = ?`);
+					updateValues.push(val);
+				}
+			}
+
+			if (timestamps && !('updatedAt' in values)) {
+				updates.push(`${escapeColumnName('updatedAt')} = ?`);
+				updateValues.push(Date.now());
+			}
+
+			if (!updates.length)
+				throw new Error('No valid fields provided for update');
+
+			const whereClauseParts: string[] = [];
+			const whereValues: ORMInputValue[] = [];
+
+			if (paranoid)
+				whereClauseParts.push(
+					`${tableName}.${escapeColumnName('deletedAt')} IS NULL`,
+				);
+
+			const whereStr = parseWhere(opts.where, whereValues);
+			if (whereStr) whereClauseParts.push(whereStr);
+
+			const sql = `UPDATE ${tableName} SET ${updates.join(
+				', ',
+			)} WHERE ${whereClauseParts.join(' AND ')}`;
+
+			const stmt = db.prepare(sql);
+			const result = stmt.run(
+				...updateValues.map(toSQLInputValue),
+				...whereValues.map(toSQLInputValue),
+			);
+			return { changes: result.changes };
+		}
+
 		static async setRelated(
 			record: Record<string, ORMInputValue>,
 			associationName: string,
@@ -149,7 +231,7 @@ export function model(
 				| Record<string, ORMInputValue>
 				| Record<string, ORMInputValue>[]
 				| null,
-		) {
+		): Promise<void> {
 			const association =
 				associations.belongsTo.get(associationName) ||
 				associations.hasMany.get(associationName);
@@ -162,19 +244,15 @@ export function model(
 				const refField = Object.entries(schema).find(
 					([_, f]) => f.references?.model === associationName,
 				)?.[0];
-
 				if (!refField) {
 					throw new Error(
 						`No association or reference found for ${associationName}`,
 					);
 				}
-
-				const exists = modelRegistry?.get(associationName);
-				if (!exists) {
+				relatedModel = modelRegistry?.get(associationName);
+				if (!relatedModel) {
 					throw new Error(`Model ${associationName} not registered`);
 				}
-				relatedModel = exists;
-
 				foreignKey = refField;
 				targetPrimaryKey = schema[refField]?.references?.key || 'id';
 			} else {
@@ -190,13 +268,15 @@ export function model(
 				Object.entries(schema).find(([_, field]) => field.primaryKey)?.[0] ||
 				'id';
 
-			if (
+			const isBelongsTo =
 				associations.belongsTo.has(associationName) ||
-				!associations.hasMany.has(associationName)
-			) {
+				!associations.hasMany.has(associationName);
+
+			if (isBelongsTo) {
 				if (!relatedData || Array.isArray(relatedData)) {
 					throw new Error(`Expected a single record for belongsTo association`);
 				}
+
 				const relatedId = relatedData[targetPrimaryKey];
 				await this.update(
 					{ [foreignKey]: relatedId },
@@ -208,10 +288,23 @@ export function model(
 						`Expected an array of records for hasMany association`,
 					);
 				}
+
 				const recordId = record[primaryKey];
 				const relatedIds = relatedData
 					.map(r => r[targetPrimaryKey])
 					.filter(id => id !== undefined);
+
+				const currentRelatedRecords = await relatedModel.findAll({
+					where: { [foreignKey]: recordId },
+				});
+				const currentIds = currentRelatedRecords.map(r => r[targetPrimaryKey]);
+
+				if (
+					currentIds.length === relatedIds.length &&
+					currentIds.every(id => relatedIds.includes(id!))
+				) {
+					return;
+				}
 
 				await relatedModel.update(
 					{ [foreignKey]: null },
@@ -615,93 +708,6 @@ export function model(
 		): Promise<Record<string, ORMInputValue> | null> {
 			const results = await Model.findAll({ ...opts, limit: 1 });
 			return results?.[0] ? JSON.parse(JSON.stringify(results[0])) : null;
-		}
-
-		static async update(
-			values: Partial<Record<string, ORMInputValue>>,
-			opts: { where: ExtendedWhereOptions },
-		): Promise<{ changes: number | bigint }> {
-			const {
-				timestamps = true,
-				paranoid = false,
-				underscored = false,
-			} = options;
-			const updates: string[] = [];
-			const updateValues: ORMInputValue[] = [];
-
-			for (const [key, value] of Object.entries(values)) {
-				const fieldDef = schema[key];
-				if (!fieldDef || fieldDef.isVirtual || fieldDef.readOnly) continue;
-
-				if (value === null && fieldDef.allowNull === false) {
-					throw new Error(
-						`Cannot set ${key} to NULL: field is defined with allowNull: false`,
-					);
-				}
-
-				const col =
-					fieldDef.field ??
-					(underscored ? key.replace(/([A-Z])/g, '_$1').toLowerCase() : key);
-				const escapedCol = escapeColumnName(col);
-
-				if (fieldDef.type === DataType.JSON) {
-					updates.push(`${escapedCol} = ?`);
-					updateValues.push(JSON.stringify(value));
-					continue;
-				}
-
-				const fnResult = handleSQLFunction(value!, key, underscored);
-
-				if (
-					typeof fnResult === 'string' &&
-					/^\w+\s*\(.*\)$/.test(fnResult.trim())
-				) {
-					updates.push(`${escapedCol} = ${fnResult}`);
-				} else {
-					let val: ORMInputValue = value ?? '';
-					val = transformField(val, fieldDef, (v: unknown) => {
-						val = v as ORMInputValue;
-					});
-					validateField(val, fieldDef, key);
-					updates.push(`${escapedCol} = ?`);
-					updateValues.push(val);
-				}
-			}
-
-			if (timestamps && !('updatedAt' in values)) {
-				updates.push(`${escapeColumnName('updatedAt')} = ?`);
-				updateValues.push(Date.now());
-			}
-
-			if (!updates.length)
-				throw new Error('No valid fields provided for update');
-
-			const whereClauseParts: string[] = [];
-			const whereValues: ORMInputValue[] = [];
-
-			if (paranoid) {
-				whereClauseParts.push(
-					`${tableName}.${escapeColumnName('deletedAt')} IS NULL`,
-				);
-			}
-
-			const whereStr = parseWhere(opts.where, whereValues);
-			if (whereStr) whereClauseParts.push(whereStr);
-
-			const sql = `UPDATE ${tableName} SET ${updates.join(
-				', ',
-			)} WHERE ${whereClauseParts.join(' AND ')}`;
-
-			try {
-				const stmt = db.prepare(sql);
-				const result = stmt.run(
-					...updateValues.map(toSQLInputValue),
-					...whereValues.map(toSQLInputValue),
-				);
-				return { changes: result.changes };
-			} catch (error) {
-				throw error;
-			}
 		}
 
 		static async upsert(

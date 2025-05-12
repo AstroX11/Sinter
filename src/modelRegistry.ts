@@ -1,1 +1,1 @@
-export const modelRegistry: Map<string, { new (): any }> = new Map();
+export const modelRegistry: Map<string, any> = new Map();
