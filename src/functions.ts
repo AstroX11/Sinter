@@ -306,17 +306,20 @@ export function model(
 					return;
 				}
 
-				await relatedModel.update(
-					{ [foreignKey]: null },
-					{
-						where: {
-							[foreignKey]: recordId,
-							[targetPrimaryKey]: {
-								[Op.notIn]: relatedIds.length > 0 ? relatedIds : [0],
+				const fkField = relatedModel.schema[foreignKey];
+				if (!fkField || fkField.allowNull !== false) {
+					await relatedModel.update(
+						{ [foreignKey]: null },
+						{
+							where: {
+								[foreignKey]: recordId,
+								[targetPrimaryKey]: {
+									[Op.notIn]: relatedIds.length > 0 ? relatedIds : [0],
+								},
 							},
 						},
-					},
-				);
+					);
+				}
 
 				for (const related of relatedData) {
 					await relatedModel.update(
