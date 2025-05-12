@@ -45,6 +45,8 @@ export function model(
 	const associations = {
 		belongsTo: new Map<string, Association>(),
 		hasMany: new Map<string, Association>(),
+		hasOne: new Map<string, Association>(),
+		belongsToMany: new Map<string, Association>(),
 	};
 
 	return class Model implements ModelInstance {
@@ -86,60 +88,37 @@ export function model(
 			modelRegistry?.set(targetModel.name, registeredModel);
 		}
 
-		static async getRelated(
-			record: Record<string, ORMInputValue>,
-			associationName: string,
+		static hasOne(
+			targetModel: ModelConstructor,
+			options: { foreignKey: string; as?: string },
 		) {
-			const association =
-				associations.belongsTo.get(associationName) ||
-				associations.hasMany.get(associationName);
+			const as = options.as || targetModel.name;
+			associations.hasOne.set(as, {
+				model: targetModel,
+				foreignKey: options.foreignKey,
+				as,
+			});
+			modelRegistry?.set(targetModel.name, targetModel);
+		}
 
-			let relatedModel: ModelConstructor;
-			let foreignKey: string;
-			let targetPrimaryKey: string;
-
-			if (!association) {
-				const refField = Object.entries(schema).find(
-					([_, f]) => f.references?.model === associationName,
-				)?.[0];
-				if (!refField) {
-					throw new Error(
-						`No association or reference found for ${associationName}`,
-					);
-				}
-				const modelFromRegistry = modelRegistry?.get(associationName);
-				if (!modelFromRegistry) {
-					throw new Error(`Model ${associationName} not registered`);
-				}
-				relatedModel = modelFromRegistry;
-				foreignKey = refField;
-				targetPrimaryKey = schema[refField]?.references?.key || 'id';
-			} else {
-				relatedModel = association.model;
-				foreignKey = association.foreignKey;
-				targetPrimaryKey =
-					Object.entries(relatedModel.schema).find(
-						([_, field]) => field.primaryKey,
-					)?.[0] || 'id';
-			}
-
-			const primaryKey =
-				Object.entries(schema).find(([_, field]) => field.primaryKey)?.[0] ||
-				'id';
-
-			if (
-				associations.belongsTo.has(associationName) ||
-				!associations.hasMany.has(associationName)
-			) {
-				const relatedId = record[foreignKey];
-				if (!relatedId) return null;
-				return await relatedModel.findByPk(relatedId as any);
-			} else {
-				const recordId = record[primaryKey];
-				return await relatedModel.findAll({
-					where: { [foreignKey]: recordId },
-				});
-			}
+		static belongsToMany(
+			targetModel: ModelConstructor,
+			options: {
+				through: string;
+				foreignKey: string;
+				otherKey: string;
+				as?: string;
+			},
+		) {
+			const as = options.as || targetModel.name;
+			associations.belongsToMany.set(as, {
+				model: targetModel,
+				through: options.through,
+				foreignKey: options.foreignKey,
+				otherKey: options.otherKey,
+				as,
+			});
+			modelRegistry?.set(targetModel.name, targetModel);
 		}
 
 		static async update(
@@ -222,116 +201,6 @@ export function model(
 				...whereValues.map(toSQLInputValue),
 			);
 			return { changes: result.changes };
-		}
-
-		static async setRelated(
-			record: Record<string, ORMInputValue>,
-			associationName: string,
-			relatedData:
-				| Record<string, ORMInputValue>
-				| Record<string, ORMInputValue>[]
-				| null,
-		): Promise<void> {
-			const association =
-				associations.belongsTo.get(associationName) ||
-				associations.hasMany.get(associationName);
-
-			let relatedModel: ModelConstructor;
-			let foreignKey: string;
-			let targetPrimaryKey: string;
-
-			if (!association) {
-				const refField = Object.entries(schema).find(
-					([_, f]) => f.references?.model === associationName,
-				)?.[0];
-				if (!refField) {
-					throw new Error(
-						`No association or reference found for ${associationName}`,
-					);
-				}
-				relatedModel = modelRegistry?.get(associationName);
-				if (!relatedModel) {
-					throw new Error(`Model ${associationName} not registered`);
-				}
-				foreignKey = refField;
-				targetPrimaryKey = schema[refField]?.references?.key || 'id';
-			} else {
-				relatedModel = association.model;
-				foreignKey = association.foreignKey;
-				targetPrimaryKey =
-					Object.entries(relatedModel.schema).find(
-						([_, field]) => field.primaryKey,
-					)?.[0] || 'id';
-			}
-
-			const primaryKey =
-				Object.entries(schema).find(([_, field]) => field.primaryKey)?.[0] ||
-				'id';
-
-			const isBelongsTo =
-				associations.belongsTo.has(associationName) ||
-				!associations.hasMany.has(associationName);
-
-			if (isBelongsTo) {
-				if (!relatedData || Array.isArray(relatedData)) {
-					throw new Error(`Expected a single record for belongsTo association`);
-				}
-
-				const relatedId = relatedData[targetPrimaryKey];
-				await this.update(
-					{ [foreignKey]: relatedId },
-					{ where: { [primaryKey]: record[primaryKey] } },
-				);
-			} else {
-				if (!Array.isArray(relatedData)) {
-					throw new Error(
-						`Expected an array of records for hasMany association`,
-					);
-				}
-
-				const recordId = record[primaryKey];
-				const relatedIds = relatedData
-					.map(r => r[targetPrimaryKey])
-					.filter(id => id !== undefined);
-
-				const currentRelatedRecords = await relatedModel.findAll({
-					where: { [foreignKey]: recordId },
-				});
-				const currentIds = currentRelatedRecords.map(r => r[targetPrimaryKey]);
-
-				if (
-					currentIds.length === relatedIds.length &&
-					currentIds.every(id => relatedIds.includes(id!))
-				) {
-					return;
-				}
-
-				const fkField = relatedModel.schema[foreignKey];
-				if (!fkField || fkField.allowNull !== false) {
-					await relatedModel.update(
-						{ [foreignKey]: null },
-						{
-							where: {
-								[foreignKey]: recordId,
-								[targetPrimaryKey]: {
-									[Op.notIn]: relatedIds.length > 0 ? relatedIds : [0],
-								},
-							},
-						},
-					);
-				}
-
-				for (const related of relatedData) {
-					await relatedModel.update(
-						{ [foreignKey]: recordId },
-						{
-							where: {
-								[targetPrimaryKey]: related[targetPrimaryKey],
-							},
-						},
-					);
-				}
-			}
 		}
 
 		static async create(

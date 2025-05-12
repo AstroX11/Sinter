@@ -246,28 +246,22 @@ export type ModelConstructor = {
 			as?: string;
 		},
 	): void;
-	getRelated(
-		record: Record<string, ORMInputValue>,
-		associationName: string,
-	): Promise<
-		Record<string, ORMInputValue> | Record<string, ORMInputValue>[] | null
-	>;
-	setRelated(
-		record: Record<string, ORMInputValue>,
-		associationName: string,
-		relatedData:
-			| Record<string, ORMInputValue>
-			| Record<string, ORMInputValue>[]
-			| null,
-	): Promise<void>;
-	setRelated(
-		record: Record<string, ORMInputValue>,
-		associationName: string,
-		relatedData:
-			| Record<string, ORMInputValue>
-			| Record<string, ORMInputValue>[]
-			| null,
-	): Promise<void>;
+	hasOne(
+		targetModel: ModelConstructor,
+		options: {
+			foreignKey: string;
+			as?: string;
+		},
+	): void;
+	belongsToMany(
+		targetModel: ModelConstructor,
+		options: {
+			through: string;
+			foreignKey: string;
+			otherKey: string;
+			as?: string;
+		},
+	): void;
 	create(
 		data: CreationAttributes<Schema, ModelOptions>,
 	): Promise<Record<string, ORMInputValue>>;
@@ -363,6 +357,8 @@ export type ModelConstructor = {
 export interface Association {
 	model: ModelConstructor;
 	foreignKey: string;
+	through?: string;
+	otherKey?: string;
 	as: string;
 }
 
