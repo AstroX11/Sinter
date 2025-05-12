@@ -38,41 +38,9 @@ export function model(
 ) {
 	setupTable(db, tableName, schema, options);
 
-	const associations = {
-		belongsTo: new Map<
-			string,
-			{ model: any; foreignKey: string; as: string }
-		>(),
-		hasMany: new Map<string, { model: any; foreignKey: string; as: string }>(),
-	};
-
 	return class Model {
 		static async query(query: string): Promise<unknown> {
 			return Promise.resolve(db.exec(query));
-		}
-
-		static belongsTo(
-			targetModel: any,
-			options: { foreignKey: string; as?: string },
-		) {
-			const as = options.as || targetModel.name;
-			associations.belongsTo.set(as, {
-				model: targetModel,
-				foreignKey: options.foreignKey,
-				as,
-			});
-		}
-
-		static hasMany(
-			targetModel: any,
-			options: { foreignKey: string; as?: string },
-		) {
-			const as = options.as || targetModel.name;
-			associations.hasMany.set(as, {
-				model: targetModel,
-				foreignKey: options.foreignKey,
-				as,
-			});
 		}
 
 		static async create(
