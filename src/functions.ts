@@ -89,9 +89,7 @@ export function model(
 		static async getRelated(
 			record: Record<string, ORMInputValue>,
 			associationName: string,
-		): Promise<
-			Record<string, ORMInputValue> | Record<string, ORMInputValue>[] | null
-		> {
+		) {
 			const association =
 				associations.belongsTo.get(associationName) ||
 				associations.hasMany.get(associationName);
@@ -135,7 +133,7 @@ export function model(
 			) {
 				const relatedId = record[foreignKey];
 				if (!relatedId) return null;
-				return await relatedModel.findByPk(relatedId);
+				return await relatedModel.findByPk(relatedId as any);
 			} else {
 				const recordId = record[primaryKey];
 				return await relatedModel.findAll({
@@ -151,7 +149,7 @@ export function model(
 				| Record<string, ORMInputValue>
 				| Record<string, ORMInputValue>[]
 				| null,
-		): Promise<void> {
+		) {
 			const association =
 				associations.belongsTo.get(associationName) ||
 				associations.hasMany.get(associationName);
@@ -164,15 +162,19 @@ export function model(
 				const refField = Object.entries(schema).find(
 					([_, f]) => f.references?.model === associationName,
 				)?.[0];
+
 				if (!refField) {
 					throw new Error(
 						`No association or reference found for ${associationName}`,
 					);
 				}
-				relatedModel = modelRegistry?.get(associationName);
-				if (!relatedModel) {
+
+				const exists = modelRegistry?.get(associationName);
+				if (!exists) {
 					throw new Error(`Model ${associationName} not registered`);
 				}
+				relatedModel = exists;
+
 				foreignKey = refField;
 				targetPrimaryKey = schema[refField]?.references?.key || 'id';
 			} else {
@@ -516,12 +518,13 @@ export function model(
 					if (!refField) {
 						throw new Error(`No association or reference found for ${alias}`);
 					}
-					relatedModel = modelRegistry?.get(inc.model.name);
-					if (!relatedModel) {
+					const modelFromRegistry = modelRegistry?.get(inc.model.name);
+					if (!modelFromRegistry) {
 						throw new Error(
 							`Model ${inc.model.name} not found in modelRegistry`,
 						);
 					}
+					relatedModel = modelFromRegistry;
 					foreignKey = refField;
 					targetPrimaryKey = schema[refField]?.references?.key || 'id';
 				} else {
@@ -630,7 +633,6 @@ export function model(
 				const fieldDef = schema[key];
 				if (!fieldDef || fieldDef.isVirtual || fieldDef.readOnly) continue;
 
-				// Prevent setting NULL for non-nullable fields
 				if (value === null && fieldDef.allowNull === false) {
 					throw new Error(
 						`Cannot set ${key} to NULL: field is defined with allowNull: false`,
@@ -677,10 +679,11 @@ export function model(
 			const whereClauseParts: string[] = [];
 			const whereValues: ORMInputValue[] = [];
 
-			if (paranoid)
+			if (paranoid) {
 				whereClauseParts.push(
 					`${tableName}.${escapeColumnName('deletedAt')} IS NULL`,
 				);
+			}
 
 			const whereStr = parseWhere(opts.where, whereValues);
 			if (whereStr) whereClauseParts.push(whereStr);
@@ -688,13 +691,6 @@ export function model(
 			const sql = `UPDATE ${tableName} SET ${updates.join(
 				', ',
 			)} WHERE ${whereClauseParts.join(' AND ')}`;
-
-			console.log(
-				`Update SQL: ${sql}, values:`,
-				updateValues,
-				'whereValues:',
-				whereValues,
-			);
 
 			try {
 				const stmt = db.prepare(sql);
@@ -704,7 +700,6 @@ export function model(
 				);
 				return { changes: result.changes };
 			} catch (error) {
-				console.error(`Update failed: ${error.message}`);
 				throw error;
 			}
 		}
