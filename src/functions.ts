@@ -9,6 +9,9 @@ import {
 	type ExtendedWhereOptions,
 	type ORMInputValue,
 	type FieldDefinition,
+	type Association,
+	type ModelConstructor,
+	type ModelInstance,
 } from './types.js';
 import {
 	parseWhere,
@@ -35,12 +38,201 @@ export function model(
 	tableName: string,
 	schema: Schema,
 	options: ModelOptions = {},
+	modelRegistry?: Map<string, ModelConstructor>,
 ) {
 	setupTable(db, tableName, schema, options);
 
-	return class Model {
+	const associations = {
+		belongsTo: new Map<string, Association>(),
+		hasMany: new Map<string, Association>(),
+	};
+
+	return class Model implements ModelInstance {
+		static name = tableName;
+		static schema = schema;
+
 		static async query(query: string): Promise<unknown> {
 			return Promise.resolve(db.exec(query));
+		}
+
+		static belongsTo(
+			targetModel: ModelConstructor,
+			options: { foreignKey: string; as?: string },
+		) {
+			const as = options.as || targetModel.name;
+			associations.belongsTo.set(as, {
+				model: targetModel,
+				foreignKey: options.foreignKey,
+				as,
+			});
+			modelRegistry?.set(targetModel.name, targetModel);
+		}
+
+		static hasMany(
+			targetModel: ModelConstructor,
+			options: { foreignKey: string; as?: string },
+		) {
+			const as = options.as || targetModel.name;
+			const registeredModel =
+				modelRegistry?.get(targetModel.name) || targetModel;
+			if (!registeredModel.schema) {
+				throw new Error(`Target model ${targetModel.name} has no schema`);
+			}
+			associations.hasMany.set(as, {
+				model: registeredModel,
+				foreignKey: options.foreignKey,
+				as,
+			});
+			modelRegistry?.set(targetModel.name, registeredModel);
+		}
+
+		static async getRelated(
+			record: Record<string, ORMInputValue>,
+			associationName: string,
+		): Promise<
+			Record<string, ORMInputValue> | Record<string, ORMInputValue>[] | null
+		> {
+			const association =
+				associations.belongsTo.get(associationName) ||
+				associations.hasMany.get(associationName);
+
+			let relatedModel: ModelConstructor;
+			let foreignKey: string;
+			let targetPrimaryKey: string;
+
+			if (!association) {
+				const refField = Object.entries(schema).find(
+					([_, f]) => f.references?.model === associationName,
+				)?.[0];
+				if (!refField) {
+					throw new Error(
+						`No association or reference found for ${associationName}`,
+					);
+				}
+				relatedModel = modelRegistry?.get(associationName);
+				if (!relatedModel) {
+					throw new Error(`Model ${associationName} not registered`);
+				}
+				foreignKey = refField;
+				targetPrimaryKey = schema[refField]?.references?.key || 'id';
+			} else {
+				relatedModel = association.model;
+				foreignKey = association.foreignKey;
+				targetPrimaryKey =
+					Object.entries(relatedModel.schema).find(
+						([_, field]) => field.primaryKey,
+					)?.[0] || 'id';
+			}
+
+			const primaryKey =
+				Object.entries(schema).find(([_, field]) => field.primaryKey)?.[0] ||
+				'id';
+
+			if (
+				associations.belongsTo.has(associationName) ||
+				!associations.hasMany.has(associationName)
+			) {
+				const relatedId = record[foreignKey];
+				if (!relatedId) return null;
+				return await relatedModel.findByPk(relatedId);
+			} else {
+				const recordId = record[primaryKey];
+				return await relatedModel.findAll({
+					where: { [foreignKey]: recordId },
+				});
+			}
+		}
+
+		static async setRelated(
+			record: Record<string, ORMInputValue>,
+			associationName: string,
+			relatedData:
+				| Record<string, ORMInputValue>
+				| Record<string, ORMInputValue>[]
+				| null,
+		): Promise<void> {
+			const association =
+				associations.belongsTo.get(associationName) ||
+				associations.hasMany.get(associationName);
+
+			let relatedModel: ModelConstructor;
+			let foreignKey: string;
+			let targetPrimaryKey: string;
+
+			if (!association) {
+				const refField = Object.entries(schema).find(
+					([_, f]) => f.references?.model === associationName,
+				)?.[0];
+				if (!refField) {
+					throw new Error(
+						`No association or reference found for ${associationName}`,
+					);
+				}
+				relatedModel = modelRegistry?.get(associationName);
+				if (!relatedModel) {
+					throw new Error(`Model ${associationName} not registered`);
+				}
+				foreignKey = refField;
+				targetPrimaryKey = schema[refField]?.references?.key || 'id';
+			} else {
+				relatedModel = association.model;
+				foreignKey = association.foreignKey;
+				targetPrimaryKey =
+					Object.entries(relatedModel.schema).find(
+						([_, field]) => field.primaryKey,
+					)?.[0] || 'id';
+			}
+
+			const primaryKey =
+				Object.entries(schema).find(([_, field]) => field.primaryKey)?.[0] ||
+				'id';
+
+			if (
+				associations.belongsTo.has(associationName) ||
+				!associations.hasMany.has(associationName)
+			) {
+				if (!relatedData || Array.isArray(relatedData)) {
+					throw new Error(`Expected a single record for belongsTo association`);
+				}
+				const relatedId = relatedData[targetPrimaryKey];
+				await this.update(
+					{ [foreignKey]: relatedId },
+					{ where: { [primaryKey]: record[primaryKey] } },
+				);
+			} else {
+				if (!Array.isArray(relatedData)) {
+					throw new Error(
+						`Expected an array of records for hasMany association`,
+					);
+				}
+				const recordId = record[primaryKey];
+				const relatedIds = relatedData
+					.map(r => r[targetPrimaryKey])
+					.filter(id => id !== undefined);
+
+				await relatedModel.update(
+					{ [foreignKey]: null },
+					{
+						where: {
+							[foreignKey]: recordId,
+							[targetPrimaryKey]: {
+								[Op.notIn]: relatedIds.length > 0 ? relatedIds : [0],
+							},
+						},
+					},
+				);
+
+				for (const related of relatedData) {
+					await relatedModel.update(
+						{ [foreignKey]: recordId },
+						{
+							where: {
+								[targetPrimaryKey]: related[targetPrimaryKey],
+							},
+						},
+					);
+				}
+			}
 		}
 
 		static async create(
@@ -275,34 +467,15 @@ export function model(
 			let sql = `SELECT ${selectFields
 				.map(f => `${tableName}.${f}`)
 				.join(', ')} FROM ${tableName}`;
-			const joins: string[] = [];
 			const values: ORMInputValue[] = [];
-
-			include.forEach(inc => {
-				const relatedTable = inc.model.name;
-				const alias = inc.as || relatedTable;
-				const ref = Object.values(schema).find(
-					f => f.references?.model === relatedTable,
-				);
-				if (!ref) throw new Error(`No reference found for ${relatedTable}`);
-				const refField = ref.field || ref.references?.key;
-				const escapedRefField = escapeColumnName(refField!);
-				const escapedRefKey = escapeColumnName(ref.references?.key!);
-				const joinType = inc.required ? 'INNER JOIN' : 'LEFT JOIN';
-				joins.push(
-					`${joinType} ${relatedTable} AS ${alias} ON ${tableName}.${escapedRefField} = ${alias}.${escapedRefKey}`,
-				);
-			});
 
 			const whereClauses: string[] = [];
 			if (paranoid)
 				whereClauses.push(
 					`${tableName}.${escapeColumnName('deletedAt')} IS NULL`,
 				);
-
 			if (where) whereClauses.push(parseWhere(where, values));
 			if (whereClauses.length) sql += ` WHERE ${whereClauses.join(' AND ')}`;
-			if (joins.length) sql += ` ${joins.join(' ')}`;
 			if (groupBy)
 				sql += ` GROUP BY ${
 					Array.isArray(groupBy)
@@ -321,9 +494,93 @@ export function model(
 			if (offset) sql += ` OFFSET ${offset}`;
 
 			const stmt = db.prepare(sql);
-			return JSON.parse(
-				JSON.stringify(stmt.all(...values.map(toSQLInputValue))),
-			) as Record<string, ORMInputValue>[];
+			const results = stmt.all(...values.map(toSQLInputValue)) as Record<
+				string,
+				ORMInputValue
+			>[];
+
+			for (const inc of include) {
+				const alias = inc.as || inc.model.name;
+				const association =
+					associations.belongsTo.get(alias) || associations.hasMany.get(alias);
+
+				let relatedModel: ModelConstructor;
+				let foreignKey: string;
+				let targetPrimaryKey: string;
+
+				if (!association) {
+					const refField = Object.entries(schema).find(
+						([_, f]) => f.references?.model === inc.model.name,
+					)?.[0];
+					if (!refField) {
+						throw new Error(`No association or reference found for ${alias}`);
+					}
+					relatedModel = modelRegistry?.get(inc.model.name);
+					if (!relatedModel) {
+						throw new Error(
+							`Model ${inc.model.name} not found in modelRegistry`,
+						);
+					}
+					foreignKey = refField;
+					targetPrimaryKey = schema[refField]?.references?.key || 'id';
+				} else {
+					relatedModel = association.model;
+					foreignKey = association.foreignKey;
+					targetPrimaryKey =
+						Object.entries(relatedModel.schema).find(
+							([_, field]) => field.primaryKey,
+						)?.[0] || 'id';
+				}
+
+				const primaryKey =
+					Object.entries(schema).find(([_, field]) => field.primaryKey)?.[0] ||
+					'id';
+
+				if (associations.hasMany.has(alias)) {
+					const relatedIds = results
+						.map(r => r[primaryKey])
+						.filter(id => id !== undefined);
+					for (const result of results) {
+						result[alias] = [];
+					}
+					if (relatedIds.length > 0) {
+						const relatedRecords = await relatedModel.findAll({
+							where: { [foreignKey]: { [Op.in]: relatedIds } },
+							...(inc.where || {}),
+							attributes: inc.attributes,
+							include: inc.include || [],
+						});
+						for (const result of results) {
+							result[alias] = relatedRecords.filter(
+								r => r[foreignKey] === result[primaryKey],
+							);
+						}
+					}
+				} else {
+					const relatedIds = results
+						.map(r => r[foreignKey])
+						.filter(id => id !== undefined);
+					for (const result of results) {
+						result[alias] = null;
+					}
+					if (relatedIds.length > 0) {
+						const relatedRecords = await relatedModel.findAll({
+							where: { [targetPrimaryKey]: { [Op.in]: relatedIds } },
+							...(inc.where || {}),
+							attributes: inc.attributes,
+							include: inc.include || [],
+						});
+						for (const result of results) {
+							result[alias] =
+								relatedRecords.find(
+									r => r[targetPrimaryKey] === result[foreignKey],
+								) || null;
+						}
+					}
+				}
+			}
+
+			return JSON.parse(JSON.stringify(results));
 		}
 
 		static async findByPk(
@@ -371,6 +628,13 @@ export function model(
 			for (const [key, value] of Object.entries(values)) {
 				const fieldDef = schema[key];
 				if (!fieldDef || fieldDef.isVirtual || fieldDef.readOnly) continue;
+
+				// Prevent setting NULL for non-nullable fields
+				if (value === null && fieldDef.allowNull === false) {
+					throw new Error(
+						`Cannot set ${key} to NULL: field is defined with allowNull: false`,
+					);
+				}
 
 				const col =
 					fieldDef.field ??
@@ -424,13 +688,24 @@ export function model(
 				', ',
 			)} WHERE ${whereClauseParts.join(' AND ')}`;
 
-			const stmt = db.prepare(sql);
-			const result = stmt.run(
-				...updateValues.map(toSQLInputValue),
-				...whereValues.map(toSQLInputValue),
+			console.log(
+				`Update SQL: ${sql}, values:`,
+				updateValues,
+				'whereValues:',
+				whereValues,
 			);
 
-			return { changes: result.changes };
+			try {
+				const stmt = db.prepare(sql);
+				const result = stmt.run(
+					...updateValues.map(toSQLInputValue),
+					...whereValues.map(toSQLInputValue),
+				);
+				return { changes: result.changes };
+			} catch (error) {
+				console.error(`Update failed: ${error.message}`);
+				throw error;
+			}
 		}
 
 		static async upsert(
@@ -492,125 +767,6 @@ export function model(
 					return this.findOne({ where: lookupWhere });
 				}
 			}
-		}
-
-		static async destroy(destroyOptions: {
-			where: ExtendedWhereOptions;
-			force?: boolean;
-		}): Promise<number | unknown> {
-			const { paranoid = false } = options;
-			const { where, force = false } = destroyOptions;
-
-			if (paranoid && !force)
-				return this.update({ deletedAt: Date.now() }, { where });
-
-			const whereClauses: string[] = [];
-			const values: ORMInputValue[] = [];
-
-			const whereStr = parseWhere(where, values);
-			if (whereStr) whereClauses.push(whereStr);
-
-			if (paranoid)
-				whereClauses.push(`${escapeColumnName('deletedAt')} IS NOT NULL`);
-
-			const sql = `DELETE FROM ${tableName} WHERE ${whereClauses.join(
-				' AND ',
-			)}`;
-			const stmt = db.prepare(sql);
-			const result = stmt.run(...values.map(toSQLInputValue));
-			return result.changes as number;
-		}
-
-		static async truncate({
-			cascade = false,
-		}: { cascade?: boolean } = {}): Promise<void> {
-			if (cascade) {
-				db.prepare(`DELETE FROM ${tableName}`).run();
-				db.prepare(`DELETE FROM sqlite_sequence WHERE name = ?`).run(tableName);
-			} else {
-				db.prepare(`DELETE FROM ${tableName}`).run();
-			}
-		}
-
-		static async count(
-			countOptions: { where?: ExtendedWhereOptions } = {},
-		): Promise<number> {
-			const { paranoid = false } = options;
-			const { where } = countOptions;
-
-			let sql = `SELECT COUNT(*) as count FROM ${tableName}`;
-			const whereClauses: string[] = [];
-			const values: ORMInputValue[] = [];
-
-			if (paranoid)
-				whereClauses.push(`${escapeColumnName('deletedAt')} IS NULL`);
-			if (where) whereClauses.push(parseWhere(where, values));
-
-			if (whereClauses.length) sql += ` WHERE ${whereClauses.join(' AND ')}`;
-
-			const stmt = db.prepare(sql);
-			const result = stmt.get(...values.map(toSQLInputValue)) as {
-				count: number;
-			};
-			return result.count;
-		}
-
-		static async sum(
-			field: string,
-			options: { where?: ExtendedWhereOptions } = {},
-		): Promise<number> {
-			return this._aggregate('SUM', field, options);
-		}
-
-		static async min(
-			field: string,
-			options: { where?: ExtendedWhereOptions } = {},
-		): Promise<number> {
-			return this._aggregate('MIN', field, options);
-		}
-
-		static async max(
-			field: string,
-			options: { where?: ExtendedWhereOptions } = {},
-		): Promise<number> {
-			return this._aggregate('MAX', field, options);
-		}
-
-		static async average(
-			field: string,
-			options: { where?: ExtendedWhereOptions } = {},
-		): Promise<number> {
-			return this._aggregate('AVG', field, options);
-		}
-
-		static async _aggregate(
-			fnName: string,
-			field: string,
-			opts: { where?: ExtendedWhereOptions } = {},
-		): Promise<number> {
-			const { paranoid = false } = options;
-			const { where } = opts;
-
-			const fieldDef = schema[field];
-			if (!fieldDef) throw new Error(`Field ${field} not found in schema`);
-
-			const column = fieldDef.field ?? field;
-			const escapedColumn = escapeColumnName(column);
-			let sql = `SELECT ${fnName}(${escapedColumn}) as value FROM ${tableName}`;
-			const whereClauses: string[] = [];
-			const values: ORMInputValue[] = [];
-
-			if (paranoid)
-				whereClauses.push(`${escapeColumnName('deletedAt')} IS NULL`);
-			if (where) whereClauses.push(parseWhere(where, values));
-
-			if (whereClauses.length) sql += ` WHERE ${whereClauses.join(' AND ')}`;
-
-			const stmt = db.prepare(sql);
-			const result = stmt.get(...values.map(toSQLInputValue)) as {
-				value: number | null;
-			};
-			return result.value ?? 0;
 		}
 
 		static async bulkCreate(
@@ -744,6 +900,136 @@ export function model(
 			return JSON.parse(JSON.stringify(insertedRecords));
 		}
 
+		static async findOrCreate(opts: {
+			where: ExtendedWhereOptions;
+			extras: CreationAttributes<typeof schema, typeof options>;
+		}): Promise<[Record<string, ORMInputValue>, boolean]> {
+			const existing = await this.findOne({ where: opts.where });
+			if (existing) return [existing, false];
+
+			const created = await this.create({ ...opts.extras, ...opts.where });
+			return [created, true];
+		}
+
+		static async destroy(destroyOptions: {
+			where: ExtendedWhereOptions;
+			force?: boolean;
+		}): Promise<number | unknown> {
+			const { paranoid = false } = options;
+			const { where, force = false } = destroyOptions;
+
+			if (paranoid && !force)
+				return this.update({ deletedAt: Date.now() }, { where });
+
+			const whereClauses: string[] = [];
+			const values: ORMInputValue[] = [];
+
+			const whereStr = parseWhere(where, values);
+			if (whereStr) whereClauses.push(whereStr);
+
+			if (paranoid)
+				whereClauses.push(`${escapeColumnName('deletedAt')} IS NOT NULL`);
+
+			const sql = `DELETE FROM ${tableName} WHERE ${whereClauses.join(
+				' AND ',
+			)}`;
+			const stmt = db.prepare(sql);
+			const result = stmt.run(...values.map(toSQLInputValue));
+			return result.changes as number;
+		}
+
+		static async truncate({
+			cascade = false,
+		}: { cascade?: boolean } = {}): Promise<void> {
+			if (cascade) {
+				db.prepare(`DELETE FROM ${tableName}`).run();
+				db.prepare(`DELETE FROM sqlite_sequence WHERE name = ?`).run(tableName);
+			} else {
+				db.prepare(`DELETE FROM ${tableName}`).run();
+			}
+		}
+
+		static async count(
+			countOptions: { where?: ExtendedWhereOptions } = {},
+		): Promise<number> {
+			const { paranoid = false } = options;
+			const { where } = countOptions;
+
+			let sql = `SELECT COUNT(*) as count FROM ${tableName}`;
+			const whereClauses: string[] = [];
+			const values: ORMInputValue[] = [];
+
+			if (paranoid)
+				whereClauses.push(`${escapeColumnName('deletedAt')} IS NULL`);
+			if (where) whereClauses.push(parseWhere(where, values));
+
+			if (whereClauses.length) sql += ` WHERE ${whereClauses.join(' AND ')}`;
+
+			const stmt = db.prepare(sql);
+			const result = stmt.get(...values.map(toSQLInputValue)) as {
+				count: number;
+			};
+			return result.count;
+		}
+
+		static async sum(
+			field: string,
+			options: { where?: ExtendedWhereOptions } = {},
+		): Promise<number> {
+			return this._aggregate('SUM', field, options);
+		}
+
+		static async min(
+			field: string,
+			options: { where?: ExtendedWhereOptions } = {},
+		): Promise<number> {
+			return this._aggregate('MIN', field, options);
+		}
+
+		static async max(
+			field: string,
+			options: { where?: ExtendedWhereOptions } = {},
+		): Promise<number> {
+			return this._aggregate('MAX', field, options);
+		}
+
+		static async average(
+			field: string,
+			options: { where?: ExtendedWhereOptions } = {},
+		): Promise<number> {
+			return this._aggregate('AVG', field, options);
+		}
+
+		static async _aggregate(
+			fnName: string,
+			field: string,
+			opts: { where?: ExtendedWhereOptions } = {},
+		): Promise<number> {
+			const { paranoid = false } = options;
+			const { where } = opts;
+
+			const fieldDef = schema[field];
+			if (!fieldDef) throw new Error(`Field ${field} not found in schema`);
+
+			const column = fieldDef.field ?? field;
+			const escapedColumn = escapeColumnName(column);
+			let sql = `SELECT ${fnName}(${escapedColumn}) as value FROM ${tableName}`;
+			const whereClauses: string[] = [];
+			const values: ORMInputValue[] = [];
+
+			if (paranoid)
+				whereClauses.push(`${escapeColumnName('deletedAt')} IS NULL`);
+			if (where) whereClauses.push(parseWhere(where, values));
+
+			if (whereClauses.length) sql += ` WHERE ${whereClauses.join(' AND ')}`;
+
+			const stmt = db.prepare(sql);
+			const result = stmt.get(...values.map(toSQLInputValue)) as {
+				value: number | null;
+			};
+			return result.value ?? 0;
+		}
+
 		static async increment(
 			fields: Record<string, number>,
 			opts: { where: ExtendedWhereOptions; by?: number },
@@ -795,17 +1081,6 @@ export function model(
 			);
 		}
 
-		static async findOrCreate(opts: {
-			where: ExtendedWhereOptions;
-			extras: CreationAttributes<typeof schema, typeof options>;
-		}): Promise<[Record<string, ORMInputValue>, boolean]> {
-			const existing = await this.findOne({ where: opts.where });
-			if (existing) return [existing, false];
-
-			const created = await this.create({ ...opts.extras, ...opts.where });
-			return [created, true];
-		}
-
 		static async restore(restoreOptions: {
 			where: ExtendedWhereOptions;
 		}): Promise<number | unknown> {
@@ -815,5 +1090,7 @@ export function model(
 				);
 			return this.update({ deletedAt: null }, { where: restoreOptions.where });
 		}
-	};
+
+		[key: string]: ORMInputValue;
+	} as ModelConstructor;
 }
