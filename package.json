@@ -1,30 +1,30 @@
 {
-  "name": "@astrox11/sqlite",
-  "version": "4.0.0",
-  "description": "A simple ORM for node:sqlite",
-  "main": "./dist/src/index.js",
-  "type": "module",
-  "repository": "https://github.com/AstroX11/sqlite",
-  "author": "AstroX11 <danielfx0012@gmail.com>",
-  "license": "MIT",
-  "private": false,
-  "exports": {
-    ".": "./dist/src/index.js"
-  },
-  "files": [
-    "dist/**/*"
-  ],
-  "engines": {
-    "node": ">=23"
-  },
-  "scripts": {
-    "build": "tsc"
-  },
-  "dependencies": {
-    "@types/node": "^22.14.1",
-    "typescript": "^5.8.3"
-  },
-  "publishConfig": {
-    "access": "public"
-  }
+	"name": "qunatava",
+	"version": "1.0.0",
+	"description": "A powerful, expressive ORM for Node.js, built on SQLite.",
+	"main": "./dist/src/index.js",
+	"type": "module",
+	"repository": "https://github.com/AstroX11/sqlite",
+	"author": "AstroX11 <danielfx0012@gmail.com>",
+	"license": "MIT",
+	"private": false,
+	"exports": {
+		".": "./dist/src/index.js"
+	},
+	"files": [
+		"dist/**/*"
+	],
+	"engines": {
+		"node": ">=23"
+	},
+	"scripts": {
+		"build": "tsc"
+	},
+	"dependencies": {
+		"@types/node": "^22.15.18",
+		"typescript": "^5.8.3"
+	},
+	"publishConfig": {
+		"access": "public"
+	}
 }
