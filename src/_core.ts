@@ -1,9 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
-import { model } from './functions.js';
+import { model } from './_instance.js';
 import { JournalMode } from './types.js';
-import { setupDatabase } from './hooks.js';
+import { modelRegistry } from './utils.js';
 import type { DatabaseOptions, ModelOptions, Schema } from './types.js';
-import { modelRegistry } from './modelRegistry.js';
 
 export class Database {
 	private db: DatabaseSync;
@@ -29,7 +28,10 @@ export class Database {
 			...otherOptions,
 		});
 
-		setupDatabase(this.db, { journalMode, busyTimeout });
+		this.db.exec(`PRAGMA journal_mode = ${options.journalMode}`);
+		if (options.busyTimeout !== undefined) {
+			this.db.exec(`PRAGMA busy_timeout = ${options.busyTimeout}`);
+		}
 	}
 
 	define(tableName: string, schema: Schema, options: ModelOptions = {}) {

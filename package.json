@@ -2,17 +2,17 @@
 	"name": "qunatava",
 	"version": "1.0.0",
 	"description": "A powerful, expressive ORM for Node.js, built on SQLite.",
-	"main": "./dist/src/index.js",
+	"main": "./lib/src/index.mjs",
 	"type": "module",
 	"repository": "https://github.com/AstroX11/sqlite",
 	"author": "AstroX11 <danielfx0012@gmail.com>",
 	"license": "MIT",
 	"private": false,
 	"exports": {
-		".": "./dist/src/index.js"
+		".": "./lib/src/index.mjs"
 	},
 	"files": [
-		"dist/**/*"
+		"lib/**/*"
 	],
 	"engines": {
 		"node": ">=23"

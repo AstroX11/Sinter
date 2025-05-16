@@ -137,3 +137,12 @@ dist
 
 # Database Tests
 *.db
+
+# Build Files for this Project
+lib
+
+# Test files
+test.ts
+test.js
+test.mjs
+test.mts

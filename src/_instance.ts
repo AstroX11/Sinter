@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { setupTable } from './hooks.js';
+import { setupTable } from './_model.js';
 import {
 	DataType,
 	type Schema,
@@ -24,15 +24,9 @@ import {
 	toSQLInputValue,
 	normalizeToOrmInput,
 	Op,
-	SQLITE_RESERVED_KEYWORDS,
-} from './tools.js';
-import { modelRegistry } from './modelRegistry.js';
-
-function escapeColumnName(column: string): string {
-	return SQLITE_RESERVED_KEYWORDS.has(column.toLowerCase())
-		? `"${column}"`
-		: column;
-}
+	modelRegistry,
+	escapeColumnName,
+} from './utils.js';
 
 export function model(
 	db: DatabaseSync,

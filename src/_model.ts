@@ -1,25 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
-import {
-	JournalMode,
-	type Schema,
-	type ModelOptions,
-	type FieldDefinition,
-} from './types.js';
-import { SQLITE_RESERVED_KEYWORDS } from './tools.js';
-
-export function escapeSQLiteValue(value: unknown): string {
-	if (typeof value === 'string') {
-		return `'${value.replace(/'/g, "''")}'`;
-	} else if (typeof value === 'number') {
-		return value.toString();
-	} else if (typeof value === 'boolean') {
-		return value ? '1' : '0';
-	} else if (value === null) {
-		return 'NULL';
-	} else {
-		throw new Error(`Unsupported default value type: ${typeof value}`);
-	}
-}
+import { escapeSQLiteValue, SQLITE_RESERVED_KEYWORDS } from './utils.js';
+import type { Schema, ModelOptions, FieldDefinition } from './types.js';
 
 export function setupTable(
 	db: DatabaseSync,
@@ -242,15 +223,5 @@ export function setupTable(
 		console.warn(
 			`Warning: STRICT and WITHOUT ROWID cannot be used together. Only one will be applied if supported.`,
 		);
-	}
-}
-
-export function setupDatabase(
-	db: DatabaseSync,
-	options: { journalMode: JournalMode; busyTimeout?: number },
-) {
-	db.exec(`PRAGMA journal_mode = ${options.journalMode}`);
-	if (options.busyTimeout !== undefined) {
-		db.exec(`PRAGMA busy_timeout = ${options.busyTimeout}`);
 	}
 }

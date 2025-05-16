@@ -6,6 +6,11 @@ import {
 } from './types.js';
 
 /**
+ * This simple constant is the core that allows us to make our db create model relationship.
+ */
+export const modelRegistry: Map<string, any> = new Map();
+
+/**
  * Operators for querying in a database or ORM.
  * These operators can be used to build complex queries.
  */
@@ -331,6 +336,12 @@ export function escapeSQLiteValue(value: unknown): string {
 	} else {
 		throw new Error(`Unsupported default value type: ${typeof value}`);
 	}
+}
+
+export function escapeColumnName(column: string): string {
+	return SQLITE_RESERVED_KEYWORDS.has(column.toLowerCase())
+		? `"${column}"`
+		: column;
 }
 
 export const SQLITE_RESERVED_KEYWORDS = new Set([
