@@ -1,4 +1,4 @@
-# `Qunatava`
+# `Quantava`
 
 ## About
 
