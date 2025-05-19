@@ -111,6 +111,7 @@ export function parseWhere(
 	values: ORMInputValue[],
 ): string {
 	const clauses: string[] = [];
+
 	for (const [key, val] of Object.entries(w)) {
 		if (key === 'or' && Array.isArray(val)) {
 			clauses.push(`(${val.map(v => parseWhere(v, values)).join(' OR ')})`);
@@ -147,8 +148,12 @@ export function parseWhere(
 				clauses.push(`${key} != ?`);
 				values.push(val[Op.ne]);
 			} else if (val[Op.eq]) {
-				clauses.push(`${key} = ?`);
-				values.push(val[Op.eq]);
+				if (val[Op.eq] === null) {
+					clauses.push(`${key} IS NULL`);
+				} else {
+					clauses.push(`${key} = ?`);
+					values.push(val[Op.eq]);
+				}
 			} else if (val[Op.in] && Array.isArray(val[Op.in])) {
 				clauses.push(`${key} IN (${val[Op.in].map(() => '?').join(', ')})`);
 				values.push(...val[Op.in]);
@@ -166,14 +171,23 @@ export function parseWhere(
 			} else if (val[Op.is] !== undefined) {
 				clauses.push(`${key} IS ${val[Op.is] === null ? 'NULL' : 'NOT NULL'}`);
 			} else {
+				if (val === null) {
+					clauses.push(`${key} IS NULL`);
+				} else {
+					clauses.push(`${key} = ?`);
+					values.push(val);
+				}
+			}
+		} else {
+			if (val === null) {
+				clauses.push(`${key} IS NULL`);
+			} else {
 				clauses.push(`${key} = ?`);
 				values.push(val);
 			}
-		} else {
-			clauses.push(`${key} = ?`);
-			values.push(val);
 		}
 	}
+
 	return clauses.join(' AND ');
 }
 
