@@ -51,6 +51,13 @@ export function model(
 			return Promise.resolve(db.exec(query));
 		}
 
+		static async sync(force: boolean = false) {
+			if (force) {
+				db.exec(`DROP TABLE IF EXISTS ${tableName}`);
+			}
+			setupTable(db, tableName, schema, options);
+		}
+
 		static belongsTo(
 			targetModel: ModelConstructor,
 			options: { foreignKey: string; as?: string },
