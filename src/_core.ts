@@ -49,6 +49,8 @@ export class Database {
 	}
 
 	close() {
-		return this.db.close();
+		try {
+			return this.db.close();
+		} catch {}
 	}
 }
