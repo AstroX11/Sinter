@@ -521,7 +521,7 @@ export function model(
 						});
 						for (const result of results) {
 							result[alias] = relatedRecords.filter(
-								r => r[foreignKey] === result[primaryKey],
+								(r:any) => r[foreignKey] === result[primaryKey],
 							);
 						}
 					}
@@ -542,7 +542,7 @@ export function model(
 						for (const result of results) {
 							result[alias] =
 								relatedRecords.find(
-									r => r[targetPrimaryKey] === result[foreignKey],
+									(r:any) => r[targetPrimaryKey] === result[foreignKey],
 								) || null;
 						}
 					}
