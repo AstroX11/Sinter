@@ -1,6 +1,6 @@
 {
 	"name": "quantava",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"description": "A powerful, expressive ORM for Node.js, built on SQLite.",
 	"main": "./lib/src/index.mjs",
 	"type": "module",
