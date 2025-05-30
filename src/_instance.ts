@@ -201,12 +201,12 @@ export function model(
 				...updateValues.map(toSQLInputValue),
 				...whereValues.map(toSQLInputValue),
 			);
-			return { changes: result.changes };
+			return { changes: result.changes as number };
 		}
 
 		static async create(
 			data: CreationAttributes<typeof schema, typeof options>,
-		): Promise<Record<string, ORMInputValue>> {
+		): Promise<unknown> {
 			const insertData: Record<string, ORMInputValue> = { ...data };
 
 			processTimestampsAndParanoid(insertData, options);
@@ -312,8 +312,8 @@ export function model(
 						def.field ??
 						(options.underscored
 							? String(field)
-									.replace(/([A-Z])/g, '_$1')
-									.toLowerCase()
+								.replace(/([A-Z])/g, '_$1')
+								.toLowerCase()
 							: String(field));
 					const escaped = escapeColumnName(column);
 					const checkSql = `SELECT 1 FROM ${tableName} WHERE ${escaped} = ? LIMIT 1`;
@@ -353,8 +353,8 @@ export function model(
 					fieldDef?.field ??
 					(options.underscored
 						? String(key)
-								.replace(/([A-Z])/g, '_$1')
-								.toLowerCase()
+							.replace(/([A-Z])/g, '_$1')
+							.toLowerCase()
 						: String(key));
 				return escapeColumnName(column);
 			});
@@ -395,7 +395,7 @@ export function model(
 
 		static async findAll(
 			query: FindAllOptions<typeof schema, typeof options> = {},
-		): Promise<Record<string, ORMInputValue>[]> {
+		): Promise<unknown[]> {
 			const {
 				timestamps = true,
 				paranoid = false,
@@ -419,8 +419,8 @@ export function model(
 					fieldDef?.field ??
 					(underscored
 						? String(k)
-								.replace(/([A-Z])/g, '_$1')
-								.toLowerCase()
+							.replace(/([A-Z])/g, '_$1')
+							.toLowerCase()
 						: String(k));
 				return escapeColumnName(column);
 			});
@@ -446,11 +446,10 @@ export function model(
 			if (where) whereClauses.push(parseWhere(where, values));
 			if (whereClauses.length) sql += ` WHERE ${whereClauses.join(' AND ')}`;
 			if (groupBy)
-				sql += ` GROUP BY ${
-					Array.isArray(groupBy)
-						? groupBy.map(escapeColumnName).join(', ')
-						: escapeColumnName(groupBy)
-				}`;
+				sql += ` GROUP BY ${Array.isArray(groupBy)
+					? groupBy.map(escapeColumnName).join(', ')
+					: escapeColumnName(groupBy)
+					}`;
 			if (order)
 				sql += ` ORDER BY ${order
 					.map(o =>
@@ -555,7 +554,7 @@ export function model(
 
 		static async findByPk(
 			id: number | string,
-		): Promise<Record<string, ORMInputValue> | undefined> {
+		): Promise<unknown | undefined> {
 			const { paranoid = false } = options;
 			const primaryKey = Object.entries(schema).find(
 				([_, field]) => field.primaryKey,
@@ -578,7 +577,7 @@ export function model(
 
 		static async findOne(
 			opts: FindAllOptions<typeof schema, typeof options> = {},
-		): Promise<Record<string, ORMInputValue> | null> {
+		): Promise<unknown | null> {
 			const results = await Model.findAll({ ...opts, limit: 1 });
 			return results?.[0] ? JSON.parse(JSON.stringify(results[0])) : null;
 		}
@@ -586,7 +585,7 @@ export function model(
 		static async upsert(
 			values: CreationAttributes<typeof schema, typeof options>,
 			opts: { where?: ExtendedWhereOptions } = {},
-		): Promise<Record<string, ORMInputValue> | null> {
+		): Promise<unknown | null> {
 			const processedValues: Record<string, ORMInputValue> = { ...values };
 			processTimestampsAndParanoid(processedValues, options);
 			processRecordData(schema, processedValues, options);
@@ -647,7 +646,7 @@ export function model(
 		static async bulkCreate(
 			records: CreationAttributes<typeof schema, typeof options>[],
 			bulkCreateOpts: { ignoreDuplicates?: boolean } = {},
-		): Promise<Record<string, ORMInputValue>[]> {
+		): Promise<unknown[]> {
 			const {
 				timestamps = true,
 				paranoid = false,
@@ -693,8 +692,8 @@ export function model(
 							def.field ??
 							(underscored
 								? String(field)
-										.replace(/([A-Z])/g, '_$1')
-										.toLowerCase()
+									.replace(/([A-Z])/g, '_$1')
+									.toLowerCase()
 								: String(field));
 						const escaped = escapeColumnName(column);
 						const checkSql = `SELECT 1 FROM ${tableName} WHERE ${escaped} = ? LIMIT 1`;
@@ -778,7 +777,7 @@ export function model(
 		static async findOrCreate(opts: {
 			where: ExtendedWhereOptions;
 			extras: CreationAttributes<typeof schema, typeof options>;
-		}): Promise<[Record<string, ORMInputValue>, boolean]> {
+		}): Promise<unknown | boolean> {
 			const existing = await this.findOne({ where: opts.where });
 			if (existing) return [existing, false];
 
