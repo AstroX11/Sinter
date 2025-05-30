@@ -163,14 +163,14 @@ export type SQLInputValue = string | number | boolean | null | Buffer;
 /** Create attributes shape */
 export type CreationAttributes<S extends Schema, O extends ModelOptions> = {
 	[K in keyof S as S[K]['isVirtual'] extends true ? never : K]:
-		| DataTypeToTS[S[K]['type']]
-		| null
-		| undefined;
+	| DataTypeToTS[S[K]['type']]
+	| null
+	| undefined;
 } & (O['timestamps'] extends true
 	? {
-			createdAt?: number | null | undefined;
-			updatedAt?: number | null | undefined;
-	  }
+		createdAt?: number | null | undefined;
+		updatedAt?: number | null | undefined;
+	}
 	: {}) &
 	(O['paranoid'] extends true ? { deletedAt?: number | null | undefined } : {});
 
@@ -196,7 +196,7 @@ export interface ExtendedWhereOptions {
 
 /** Include options for associations */
 export interface IncludeOptions {
-	model: { new (): any };
+	model: { new(): any };
 	as?: string;
 	include?: IncludeOptions[];
 	required?: boolean;
@@ -228,7 +228,7 @@ export interface ModelInstance {
 }
 
 export type ModelConstructor = {
-	new (): ModelInstance;
+	new(): ModelInstance;
 	name: string;
 	schema: Schema;
 	query(query: string): Promise<unknown>;
@@ -264,16 +264,16 @@ export type ModelConstructor = {
 	): void;
 	create(
 		data: CreationAttributes<Schema, ModelOptions>,
-	): Promise<Record<string, ORMInputValue>>;
+	): Promise<unknown>;
 	findAll(
 		query?: FindAllOptions<Schema, ModelOptions>,
-	): Promise<Record<string, ORMInputValue>[]>;
+	): Promise<unknown[]>;
 	findByPk(
 		id: number | string,
-	): Promise<Record<string, ORMInputValue> | undefined>;
+	): Promise<unknown | undefined>;
 	findOne(
 		opts?: FindAllOptions<Schema, ModelOptions>,
-	): Promise<Record<string, ORMInputValue> | null>;
+	): Promise<unknown | null>;
 	update(
 		values: Partial<Record<string, ORMInputValue>>,
 		opts: {
@@ -287,11 +287,11 @@ export type ModelConstructor = {
 		opts?: {
 			where?: ExtendedWhereOptions;
 		},
-	): Promise<Record<string, ORMInputValue> | null>;
+	): Promise<unknown | null>;
 	findOrCreate(opts: {
 		where: ExtendedWhereOptions;
 		extras: CreationAttributes<Schema, ModelOptions>;
-	}): Promise<[Record<string, ORMInputValue>, boolean]>;
+	}): Promise<[unknown | boolean]>;
 	destroy(destroyOptions: {
 		where: ExtendedWhereOptions;
 		force?: boolean;
@@ -334,7 +334,7 @@ export type ModelConstructor = {
 		bulkCreateOpts?: {
 			ignoreDuplicates?: boolean;
 		},
-	): Promise<Record<string, ORMInputValue>[]>;
+	): Promise<unknown[]>;
 	increment(
 		fields: Record<string, number>,
 		opts: {
