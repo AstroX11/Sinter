@@ -5,7 +5,7 @@
 	"main": "./lib/src/index.mjs",
 	"type": "module",
 	"repository": "https://github.com/AstroX11/sqlite",
-	"author": "AstroX11 <danielfx0012@gmail.com>",
+	"author": "AstroX11 <devastro0010@gmail.com>",
 	"license": "MIT",
 	"private": false,
 	"exports": {
@@ -21,7 +21,7 @@
 		"build": "tsc"
 	},
 	"dependencies": {
-		"@types/node": "^22.15.18",
+		"@types/node": "^22.15.29",
 		"typescript": "^5.8.3"
 	},
 	"publishConfig": {
