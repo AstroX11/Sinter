@@ -1,3 +1,4 @@
+import { escapeColname } from "../utils/escape.js";
 import { mapDataTypeToSQLiteType } from "./mappers.mjs";
 
 export function* queryGenerator(db, queries) {
@@ -12,7 +13,7 @@ export function* columnGenerator(columns) {
 		if (config.length && (sqliteType === "CHAR" || sqliteType === "VARCHAR")) {
 			sqliteType += `(${config.length})`;
 		}
-		let def = `${name} ${sqliteType}`;
+		let def = `${escapeColname(name)} ${sqliteType}`;
 		if (config.primaryKey) def += " PRIMARY KEY";
 		if (config.autoIncrement && config.primaryKey && sqliteType === "INTEGER")
 			def += " AUTOINCREMENT";
@@ -42,7 +43,7 @@ export function* columnGenerator(columns) {
 			def += config.stored || config.computedPersisted ? "STORED" : "VIRTUAL";
 		}
 		if (config.enumValues) {
-			def += ` CHECK (${name} IN (${config.enumValues
+			def += ` CHECK (${escapeColname(name)} IN (${config.enumValues
 				.map(v => `'${v}'`)
 				.join(", ")}))`;
 		}
@@ -63,14 +64,17 @@ export function* columnGenerator(columns) {
 export function* foreignKeysGenerator(relationships) {
 	for (const rel of relationships) {
 		if (rel.foreignKey && rel.targetModel) {
-			let fk = `FOREIGN KEY (${rel.foreignKey}) REFERENCES ${rel.targetModel} (${
+			let fk = `FOREIGN KEY (${escapeColname(
+				rel.foreignKey
+			)}) REFERENCES ${escapeColname(rel.targetModel)} (${escapeColname(
 				rel.sourceKey || "id"
-			})`;
+			)})`;
 			if (rel.onDelete) fk += ` ON DELETE ${rel.onDelete}`;
 			if (rel.onUpdate) fk += ` ON UPDATE ${rel.onUpdate}`;
 			if (rel.deferrable) fk += " DEFERRABLE";
 			if (rel.initiallyDeferred) fk += " INITIALLY DEFERRED";
-			if (rel.constraintName) fk = `CONSTRAINT ${rel.constraintName} ${fk}`;
+			if (rel.constraintName)
+				fk = `CONSTRAINT ${escapeColname(rel.constraintName)} ${fk}`;
 			if (rel.comment) fk += ` /* ${rel.comment} */`;
 			yield fk;
 		}
@@ -79,9 +83,11 @@ export function* foreignKeysGenerator(relationships) {
 
 export function* indexesGenerator(indexes) {
 	for (const index of indexes) {
-		let sql = `CREATE ${index.unique ? "UNIQUE " : ""}INDEX ${index.name} ON ${
-			index.table || "table"
-		} (${index.columns.join(", ")})`;
+		let sql = `CREATE ${index.unique ? "UNIQUE " : ""}INDEX ${escapeColname(
+			index.name
+		)} ON ${escapeColname(index.table || "table")} (${index.columns
+			.map(escapeColname)
+			.join(", ")})`;
 		if (index.where) sql += ` WHERE ${index.where}`;
 		if (index.order) sql += ` ${index.order}`;
 		if (index.expression) sql += ` USING ${index.expression}`;
@@ -97,26 +103,31 @@ export function* constraintsGenerator(constraints) {
 		if (constraint.type === "check" && constraint.expression) {
 			sql = `CHECK (${constraint.expression})`;
 		} else if (constraint.type === "foreignKey" && constraint.references) {
-			sql = `FOREIGN KEY (${constraint.columns.join(", ")}) REFERENCES ${
+			sql = `FOREIGN KEY (${constraint.columns
+				.map(escapeColname)
+				.join(", ")}) REFERENCES ${escapeColname(
 				constraint.references.table
-			} (${constraint.references.columns.join(", ")})`;
+			)} (${constraint.references.columns.map(escapeColname).join(", ")})`;
 			if (constraint.onDelete) sql += ` ON DELETE ${constraint.onDelete}`;
 			if (constraint.onUpdate) sql += ` ON UPDATE ${constraint.onUpdate}`;
 			if (constraint.deferrable) sql += " DEFERRABLE";
 			if (constraint.initiallyDeferred) sql += " INITIALLY DEFERRED";
 		} else if (constraint.type === "unique" && constraint.columns) {
-			sql = `UNIQUE (${constraint.columns.join(", ")})`;
+			sql = `UNIQUE (${constraint.columns.map(escapeColname).join(", ")})`;
 		} else if (constraint.type === "primaryKey" && constraint.columns) {
-			sql = `PRIMARY KEY (${constraint.columns.join(", ")})`;
+			sql = `PRIMARY KEY (${constraint.columns.map(escapeColname).join(", ")})`;
 		}
-		if (constraint.name && sql) sql = `CONSTRAINT ${constraint.name} ${sql}`;
+		if (constraint.name && sql)
+			sql = `CONSTRAINT ${escapeColname(constraint.name)} ${sql}`;
 		yield sql;
 	}
 }
 
 export function* triggersGenerator(triggers) {
 	for (const trigger of triggers) {
-		let sql = `CREATE TRIGGER ${trigger.name} ${trigger.timing} ${trigger.event} ON ${trigger.table}`;
+		let sql = `CREATE TRIGGER ${escapeColname(trigger.name)} ${trigger.timing} ${
+			trigger.event
+		} ON ${escapeColname(trigger.table)}`;
 		if (trigger.forEachRow) sql += " FOR EACH ROW";
 		if (trigger.when) sql += ` WHEN ${trigger.when}`;
 		sql += ` BEGIN ${trigger.statement}; END`;
@@ -126,8 +137,10 @@ export function* triggersGenerator(triggers) {
 
 export function* viewsGenerator(views) {
 	for (const view of views) {
-		let sql = `CREATE ${view.temporary ? "TEMPORARY " : ""}VIEW ${view.name}`;
-		if (view.columns) sql += ` (${view.columns.join(", ")})`;
+		let sql = `CREATE ${view.temporary ? "TEMPORARY " : ""}VIEW ${escapeColname(
+			view.name
+		)}`;
+		if (view.columns) sql += ` (${view.columns.map(escapeColname).join(", ")})`;
 		sql += ` AS ${view.select}`;
 		if (view.with) sql += ` WITH ${view.with}`;
 		yield sql;
@@ -144,7 +157,7 @@ export function* hooksGenerator(hooks, modelName) {
 
 export function* computedPropertiesGenerator(computedProperties) {
 	for (const prop of computedProperties) {
-		let sql = `${prop.name} AS (${prop.expression})`;
+		let sql = `${escapeColname(prop.name)} AS (${prop.expression})`;
 		if (prop.stored) sql += " STORED";
 		yield { sql, metadata: { dependencies: prop.dependencies } };
 	}
@@ -161,14 +174,14 @@ export function* queryOptionsGenerator(options) {
 	if (options.with) sql += `WITH ${options.with.join(", ")} `;
 	sql += "SELECT ";
 	if (options.distinct) sql += "DISTINCT ";
-	if (options.select) sql += `${options.select.join(", ")}`;
-	sql += ` FROM ${options.from}`; // Always add FROM
+	if (options.select) sql += `${options.select.map(escapeColname).join(", ")}`;
+	sql += ` FROM ${escapeColname(options.from)}`; // Always add FROM
 	if (options.join) {
 		for (const join of options.join) {
-			sql += ` ${join.type} JOIN ${join.table}`;
-			if (join.alias) sql += ` AS ${join.alias}`;
+			sql += ` ${join.type} JOIN ${escapeColname(join.table)}`;
+			if (join.alias) sql += ` AS ${escapeColname(join.alias)}`;
 			sql += ` ON ${join.on}`;
-			if (join.columns) sql += ` (${join.columns.join(", ")})`;
+			if (join.columns) sql += ` (${join.columns.map(escapeColname).join(", ")})`;
 		}
 	}
 	if (options.where) {
@@ -176,28 +189,18 @@ export function* queryOptionsGenerator(options) {
 			sql += ` WHERE ${options.where}`;
 		} else {
 			const conditions = Object.keys(options.where)
-				.map(column => `${column} = ?`)
+				.map(k => `${escapeColname(k)} = ?`)
 				.join(" AND ");
 			sql += ` WHERE ${conditions}`;
 		}
 	}
-	if (options.groupBy) sql += ` GROUP BY ${options.groupBy.join(", ")}`;
+	if (options.groupBy)
+		sql += ` GROUP BY ${options.groupBy.map(escapeColname).join(", ")}`;
 	if (options.having) sql += ` HAVING ${options.having}`;
-	if (options.window) sql += ` WINDOW ${options.window}`;
-	if (options.order)
-		sql += ` ORDER BY ${options.order
-			.map(([col, dir]) => `${col} ${dir}`)
-			.join(", ")}`;
+	if (options.orderBy)
+		sql += ` ORDER BY ${options.orderBy.map(escapeColname).join(", ")}`;
 	if (options.limit) sql += ` LIMIT ${options.limit}`;
 	if (options.offset) sql += ` OFFSET ${options.offset}`;
-	if (options.union) {
-		for (const union of options.union) {
-			sql += ` ${union.type} ${union.query}`;
-		}
-	}
-	if (options.explain) sql += " EXPLAIN";
 
-	const params = options.whereParams ? Object.values(options.whereParams) : [];
-
-	yield { sql, params };
+	yield sql;
 }

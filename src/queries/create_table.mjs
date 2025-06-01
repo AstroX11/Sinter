@@ -1,3 +1,4 @@
+import { escapeColname } from "../utils/escape.js";
 import {
 	columnGenerator,
 	foreignKeysGenerator,
@@ -40,7 +41,7 @@ export function createTable(db, modelDefinition) {
 		}
 	}
 
-	let sql = `CREATE TABLE ${tableName} (${sqlParts.join(", ")})`;
+	let sql = `CREATE TABLE ${escapeColname(tableName)} (${sqlParts.join(", ")})`;
 
 	if (modelDefinition.withoutRowid) sql += " WITHOUT ROWID";
 	if (modelDefinition.strict) sql += " STRICT";
