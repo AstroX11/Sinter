@@ -1,0 +1,17 @@
+export enum DataTypes {
+	INTEGER = "INTEGER",
+	TEXT = "TEXT",
+	BLOB = "BLOB",
+	REAL = "REAL",
+	NUMERIC = "NUMERIC",
+	BOOLEAN = "BOOLEAN",
+	DATE = "DATE",
+	DATETIME = "DATETIME",
+	NULL = "NULL",
+	JSON = "JSON",
+	UUID = "UUID",
+	ENUM = "ENUM",
+	DECIMAL = "DECIMAL",
+	STRING = "STRING",
+	ARRAY = "ARRAY",
+}
