@@ -9,12 +9,10 @@ export function defineModel(
 	const normalizedDefinition: ModelDefinition = {
 		name: modelDefinition.name,
 		tableName:
-			modelDefinition.tableName ||
-			(modelDefinition.pluralizeTablename !== false
-				? `${modelDefinition.name}s`
-				: modelDefinition.name
-			).toLowerCase(),
-		pluralizeTablename: modelDefinition.pluralizeTablename ?? true,
+			modelDefinition.tableName || modelDefinition.pluralizeTablename === true
+				? `${modelDefinition.tableName}s`
+				: (modelDefinition.tableName ?? modelDefinition.name),
+		pluralizeTablename: modelDefinition.pluralizeTablename,
 		columns: modelDefinition.columns,
 		relationships: modelDefinition.relationships,
 		indexes: modelDefinition.indexes,
@@ -22,13 +20,13 @@ export function defineModel(
 		triggers: modelDefinition.triggers,
 		views: modelDefinition.views,
 		withoutRowid: modelDefinition.withoutRowid ?? false,
-		strict: modelDefinition.strict ?? true,
+		strict: modelDefinition.strict,
 		createdAtColumn: modelDefinition.createdAtColumn,
 		updatedAtColumn: modelDefinition.updatedAtColumn,
 		deletedAtColumn: modelDefinition.deletedAtColumn,
 		versionColumn: modelDefinition.versionColumn,
 		softDelete: modelDefinition.softDelete ?? false,
-		timestamps: modelDefinition.timestamps ?? false,
+		timestamps: modelDefinition.timestamps ?? true,
 		underscored: modelDefinition.underscored ?? false,
 		displayName: modelDefinition.displayName,
 		virtualFields: modelDefinition.virtualFields,

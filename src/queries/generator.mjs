@@ -1,30 +1,43 @@
+import { Qunatava } from "../index.mjs";
+import { resolveDefaultForSchema } from "../schema/schema-utils.js";
 import { escapeColname } from "../utils/escape.js";
 import { parseWhere } from "../utils/whereParser.js";
-import { processColumnValue } from "./column_functions.mjs";
 import { mapDataTypeToSQLiteType } from "./mappers.mjs";
 
+/**
+ *
+ * @param {Qunatava} db - BetterSqlite Extended Class
+ * @param {Array<{sql:string; params:string[]}>} queries - An Array of Queries to excute
+ */
 export function* queryGenerator(db, queries) {
 	for (const { sql, params = [] } of queries) {
 		yield db.query(sql, params);
 	}
 }
 
-export function* columnGenerator(columns, row = {}, previousRow = {}) {
+/**
+ *
+ * @param {import("../index.mjs").ColumnDefinition} columns
+ */
+export function* columnGenerator(columns) {
 	for (const [name, config] of Object.entries(columns)) {
-		const processedValue = processColumnValue(
-			config,
-			row[name],
-			row,
-			previousRow[name]
-		);
 		let sqliteType = mapDataTypeToSQLiteType(config.type);
-
 		if (config.length && (sqliteType === "CHAR" || sqliteType === "VARCHAR")) {
 			sqliteType += `(${config.length})`;
 		}
 
-		let def = `${escapeColname(name)} ${sqliteType}`;
+		if (
+			(config.precision !== undefined || config.scale !== undefined) &&
+			(sqliteType === "NUMERIC" ||
+				sqliteType === "DECIMAL" ||
+				sqliteType === "REAL")
+		) {
+			const precision = config.precision ?? 0;
+			const scale = config.scale ?? 0;
+			sqliteType += `(${precision},${scale})`;
+		}
 
+		let def = `${escapeColname(name)} ${sqliteType}`;
 		if (config.primaryKey) def += " PRIMARY KEY";
 		if (config.autoIncrement && config.primaryKey && sqliteType === "INTEGER")
 			def += " AUTOINCREMENT";
@@ -32,20 +45,12 @@ export function* columnGenerator(columns, row = {}, previousRow = {}) {
 			def += " NOT NULL";
 		if (config.unique) def += " UNIQUE";
 
-		if (processedValue !== undefined && processedValue !== null) {
-			if (typeof processedValue === "string") {
-				def += ` DEFAULT '${processedValue.replace(/'/g, "''")}'`;
-			} else if (
-				typeof processedValue === "number" ||
-				typeof processedValue === "boolean"
-			) {
-				def += ` DEFAULT ${+processedValue}`;
-			} else if (typeof processedValue === "object") {
-				const jsonStr = JSON.stringify(processedValue).replace(/'/g, "''");
-				def += ` DEFAULT '${jsonStr}'`;
+		const defaultValue = resolveDefaultForSchema(config);
+		if (defaultValue !== undefined) {
+			if (typeof defaultValue === "string") {
+				def += ` DEFAULT '${defaultValue.replace(/'/g, "''")}'`;
 			} else {
-				const literal = String(processedValue).replace(/'/g, "''");
-				def += ` DEFAULT '${literal}'`;
+				def += ` DEFAULT ${defaultValue}`;
 			}
 		}
 
@@ -78,6 +83,10 @@ export function* columnGenerator(columns, row = {}, previousRow = {}) {
 	}
 }
 
+/**
+ *
+ * @param {import("../index.mjs").RelationshipDefinition} relationships
+ */
 export function* foreignKeysGenerator(relationships) {
 	for (const rel of relationships) {
 		if (rel.foreignKey && rel.targetModel) {
@@ -98,6 +107,10 @@ export function* foreignKeysGenerator(relationships) {
 	}
 }
 
+/**
+ *
+ * @param {import("../index.mjs").IndexDefinition} indexes
+ */
 export function* indexesGenerator(indexes) {
 	for (const index of indexes) {
 		let sql = `CREATE ${index.unique ? "UNIQUE " : ""}INDEX ${escapeColname(
@@ -114,6 +127,10 @@ export function* indexesGenerator(indexes) {
 	}
 }
 
+/**
+ *
+ * @param {import("../index.mjs").ConstraintDefinition} constraints
+ */
 export function* constraintsGenerator(constraints) {
 	for (const constraint of constraints) {
 		let sql = "";
@@ -152,6 +169,10 @@ export function* triggersGenerator(triggers) {
 	}
 }
 
+/**
+ *
+ * @param {import("../index.mjs").ViewDefinition} views
+ */
 export function* viewsGenerator(views) {
 	for (const view of views) {
 		let sql = `CREATE ${view.temporary ? "TEMPORARY " : ""}VIEW ${escapeColname(
@@ -180,6 +201,10 @@ export function* computedPropertiesGenerator(computedProperties) {
 	}
 }
 
+/**
+ *
+ * @param {import("../index.mjs").QueryOptions} options
+ */
 export function* queryOptionsGenerator(options) {
 	if (!options.from)
 		throw new Error(

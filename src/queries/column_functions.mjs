@@ -83,12 +83,9 @@ function enforceEnum(column, value) {
 function applyValidation(column, value) {
 	if (column.validate) {
 		const result = column.validate(value);
+
 		if (result !== true) {
-			throw new Error(
-				typeof result === "string"
-					? result
-					: `Validation failed for column: ${column.name || "unknown"}`
-			);
+			throw new Error(typeof result === "string" ? result : `Validation failed`);
 		}
 	}
 }

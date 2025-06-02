@@ -1,4 +1,5 @@
 import { createTable, type Qunatava } from "../index.mjs";
+import { processRow } from "../queries/column_functions.mjs";
 import type {
 	ModelDefinition,
 	WhereClause,
@@ -15,6 +16,13 @@ export class ModelInstance {
 	constructor(db: Qunatava, model: ModelDefinition) {
 		this.db = db;
 		this.model = model;
+	}
+
+	private processData<T extends Record<string, unknown>>(
+		data: T,
+		previousData?: Partial<T>
+	): T {
+		return processRow(this.model.columns, data, previousData) as T;
 	}
 
 	private buildWhereClause(where: WhereClause): {
@@ -78,7 +86,10 @@ export class ModelInstance {
 		options: CreateOptions = {}
 	): Promise<T> {
 		const { beforeInsert } = this.model;
-		const processedData = beforeInsert ? beforeInsert(data) : data;
+		const preprocessedData = beforeInsert ? beforeInsert(data) : data;
+
+		const processedData = this.processData(preprocessedData);
+
 		const keys = Object.keys(processedData);
 		const values = Object.values(processedData);
 		const placeholders = keys.map(() => "?").join(", ");
@@ -169,14 +180,28 @@ export class ModelInstance {
 		options: FindOptions = {}
 	): Promise<number> {
 		const { where = {}, beforeUpdate } = options;
-		const processedData = beforeUpdate ? beforeUpdate(data) : data;
-		const keys = Object.keys(processedData);
-		const values = Object.values(processedData);
-		const setClause = keys.map(key => `${key} = ?`).join(", ");
-		const { sql: whereSql, params } = this.buildWhereClause(where);
-		const query = `UPDATE ${this.model.tableName} SET ${setClause} ${whereSql}`;
-		const result = this.db.query(query, [...values, ...params]);
-		return result.changes;
+
+		const existingRows = await this.findAll<T>({ where });
+		if (!existingRows.length) return 0;
+
+		const updates: Partial<T> = beforeUpdate ? beforeUpdate(data) : data;
+
+		for (const previousRow of existingRows) {
+			const processedData = this.processData(
+				{ ...previousRow, ...updates },
+				previousRow
+			);
+			const keys = Object.keys(processedData);
+			const values = Object.values(processedData);
+			const setClause = keys.map(key => `${key} = ?`).join(", ");
+			const { sql: whereSql, params } = this.buildWhereClause({
+				[this.model.primaryKey]: previousRow[this.model.primaryKey],
+			});
+			const query = `UPDATE ${this.model.tableName} SET ${setClause} ${whereSql}`;
+			this.db.query(query, [...values, ...params]);
+		}
+
+		return existingRows.length;
 	}
 
 	async bulkCreate<T extends Record<string, unknown>>(

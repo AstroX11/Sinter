@@ -32,42 +32,260 @@ export interface ModelDefinition {
 }
 
 export interface ColumnDefinition {
+	/**
+	 * Human-readable or programmatic name of the column.
+	 * If not set explicitly, it will usually be inferred from the object key during table creation.
+	 * @example "email"
+	 */
 	name?: string;
+
+	/**
+	 * Data type of the column, following the SQL type system or the library’s abstraction.
+	 * Examples include: "STRING", "INTEGER", "REAL", "BOOLEAN", "DATE".
+	 * @example "INTEGER"
+	 */
 	type: string;
+
+	/**
+	 * Marks the column as the primary key for the table.
+	 * Primary keys uniquely identify each row and can only be set on one or more columns in a table.
+	 * @example true
+	 */
 	primaryKey?: boolean;
+
+	/**
+	 * Allows the column to store NULL values.
+	 * If true, values may be NULL. If false, NULL is rejected at the database level.
+	 * @example true
+	 */
 	allowNull?: boolean;
+
+	/**
+	 * Shortcut for marking the column as NOT NULL (opposite of `allowNull`).
+	 * Forces every row to contain a non-NULL value in this column.
+	 * @example true
+	 */
 	notNull?: boolean;
+
+	/**
+	 * Ensures all values in this column are unique across the table.
+	 * Typically used for fields like email addresses or usernames.
+	 * @example true
+	 */
 	unique?: boolean;
+
+	/**
+	 * Enables automatic increment of numeric primary keys.
+	 * Useful for auto-generated IDs in tables.
+	 * @example true
+	 */
 	autoIncrement?: boolean;
+
+	/**
+	 * The static default value assigned if no explicit value is provided during inserts.
+	 * @example "pending"
+	 */
 	defaultValue?: unknown;
+
+	/**
+	 * A raw SQL expression used as the default value, e.g., "CURRENT_TIMESTAMP".
+	 * Use this when the default value must be evaluated by SQLite directly.
+	 * @example "CURRENT_TIMESTAMP"
+	 */
 	defaultExpression?: string;
+
+	/**
+	 * A JavaScript function returning the default value at runtime.
+	 * Offers dynamic defaults like timestamps or UUIDs.
+	 * @example () => Date.now()
+	 */
 	defaultFn?: () => unknown;
+
+	/**
+	 * A SQL `CHECK` constraint to validate values at the database level.
+	 * Ensures rows meet custom conditions (e.g., "age >= 18").
+	 * @example "age >= 18"
+	 */
 	check?: string;
+
+	/**
+	 * Defines the collation sequence for this column (text comparison and sorting).
+	 * SQLite supports "BINARY", "NOCASE", and "RTRIM" by default.
+	 * @example "NOCASE"
+	 */
 	collate?: string;
+
+	/**
+	 * Defines a foreign key relationship to another table’s column.
+	 * Used for relational integrity and joins.
+	 * @example { table: "roles", column: "id" }
+	 */
 	foreignKey?: ForeignKeyReference;
+
+	/**
+	 * SQL expression to generate computed or virtual columns.
+	 * Makes the column a calculated field, not stored directly.
+	 * @example "first_name || ' ' || last_name"
+	 */
 	generatedAs?: string;
+
+	/**
+	 * Marks this column to be excluded from JSON outputs (API responses, etc.).
+	 * Useful for sensitive data or internal-only fields.
+	 * @example true
+	 */
 	hidden?: boolean;
+
+	/**
+	 * Alternative name (alias) for this column, used during query building.
+	 * Can simplify queries or resolve naming conflicts.
+	 * @example "userEmail"
+	 */
 	alias?: string;
+
+	/**
+	 * Declares the column as virtual, meaning it is not stored in the database.
+	 * Virtual columns exist only in your data model and queries.
+	 * @example true
+	 */
 	virtual?: boolean;
+
+	/**
+	 * If true, stores the result of computed expressions physically in the table (SQLite 3.31+).
+	 * Otherwise, computed columns are recalculated on-the-fly.
+	 * @example true
+	 */
 	stored?: boolean;
+
+	/**
+	 * SQL expression that defines the computed value of this column.
+	 * Typically used with `virtual` or `stored` columns.
+	 * @example "price * quantity"
+	 */
 	computedExpression?: string;
+
+	/**
+	 * If true, indicates the computed column is stored (not virtual).
+	 * Otherwise, it’s recalculated dynamically.
+	 * @example true
+	 */
 	computedPersisted?: boolean;
+
+	/**
+	 * Forces how SQLite internally stores the data (e.g., TEXT, INTEGER).
+	 * Mainly relevant for advanced type tuning.
+	 * @example "TEXT"
+	 */
 	affinity?: "TEXT" | "INTEGER" | "REAL" | "BLOB" | "NUMERIC";
+
+	/**
+	 * Constrains this column to a list of allowed string values (ENUM-like behavior).
+	 * @example ["active", "pending", "inactive"]
+	 */
 	enumValues?: string[];
+
+	/**
+	 * Maximum character length for string columns.
+	 * Helps with schema clarity and validation.
+	 * @example 255
+	 */
 	length?: number;
+
+	/**
+	 * Number of digits in numeric columns.
+	 * Commonly used with `DECIMAL` or `NUMERIC` types.
+	 * @example 10
+	 */
 	precision?: number;
+
+	/**
+	 * Number of decimal places for numeric columns.
+	 * @example 2
+	 */
 	scale?: number;
+
+	/**
+	 * Custom transformation applied when reading this column’s value from the database.
+	 * Can be used for automatic casting or formatting.
+	 * @example (value) => value?.toUpperCase()
+	 */
 	get?: (value: unknown, row?: any) => unknown;
+
+	/**
+	 * Custom transformation applied before writing to the database.
+	 * Ideal for data sanitization (e.g., trimming whitespace).
+	 * @example (value) => value.trim()
+	 */
 	set?: (value: unknown, row?: any) => unknown;
+
+	/**
+	 * Function to validate the value before writing to the database.
+	 * Should return `true` or an error message string.
+	 * @example (email) => email.includes("@") || "Invalid email"
+	 */
 	validate?: (value: unknown) => boolean | string;
+
+	/**
+	 * Transform value before insertion or update at the database level.
+	 * Can adjust formatting or apply conversions.
+	 * @example (v) => v.toLowerCase()
+	 */
 	transformIn?: (value: unknown) => unknown;
+
+	/**
+	 * Transform value after reading from the database.
+	 * Great for consistent data output formatting.
+	 * @example (v) => v.toUpperCase()
+	 */
 	transformOut?: (value: unknown) => unknown;
+
+	/**
+	 * Indicates the column must always have a value set at the application level (logical requirement).
+	 * Unlike `allowNull`, this is enforced in application logic, not the database.
+	 * @example true
+	 */
 	required?: boolean;
+
+	/**
+	 * Prevents the column from being updated once set.
+	 * Useful for immutable fields like creation timestamps.
+	 * @example true
+	 */
 	immutable?: boolean;
+
+	/**
+	 * Marks this column as an alias for another column.
+	 * Useful when you want to remap names in your application layer.
+	 * @example "first_name"
+	 */
 	aliasFor?: string;
+
+	/**
+	 * Descriptive human-readable comment for this column.
+	 * Often used in documentation or admin UIs.
+	 * @example "The user's email address"
+	 */
 	description?: string;
+
+	/**
+	 * Marks this column as deprecated.
+	 * Can be used to phase out old schema fields.
+	 * @example true
+	 */
 	deprecated?: boolean;
+
+	/**
+	 * Excludes this column from SELECT queries by default.
+	 * Data still exists, but is hidden unless explicitly requested.
+	 * @example true
+	 */
 	hiddenInSelect?: boolean;
+
+	/**
+	 * Creates an index on this column to speed up queries and improve performance.
+	 * Recommended for frequently filtered or joined fields.
+	 * @example true
+	 */
 	index?: boolean;
 }
 

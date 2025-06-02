@@ -1,3 +1,4 @@
+import { Qunatava } from "../index.mjs";
 import { escapeColname } from "../utils/escape.js";
 import {
 	columnGenerator,
