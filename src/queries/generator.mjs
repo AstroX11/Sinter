@@ -1,4 +1,5 @@
 import { escapeColname } from "../utils/escape.js";
+import { parseWhere } from "../utils/whereParser.js";
 import { mapDataTypeToSQLiteType } from "./mappers.mjs";
 
 export function* queryGenerator(db, queries) {
@@ -17,7 +18,10 @@ export function* columnGenerator(columns) {
 		if (config.primaryKey) def += " PRIMARY KEY";
 		if (config.autoIncrement && config.primaryKey && sqliteType === "INTEGER")
 			def += " AUTOINCREMENT";
-		if (config.notNull || config.required) def += " NOT NULL";
+
+		if (config.allowNull === false || config.notNull || config.required)
+			def += " NOT NULL";
+
 		if (config.unique) def += " UNIQUE";
 		if (config.defaultValue !== undefined && config.defaultValue !== null) {
 			const dv = config.defaultValue;
@@ -170,37 +174,61 @@ export function* queryOptionsGenerator(options) {
 		);
 
 	let sql = "";
+	const params = [];
 
-	if (options.with) sql += `WITH ${options.with.join(", ")} `;
+	if (options.with?.length) sql += `WITH ${options.with.join(", ")} `;
+
 	sql += "SELECT ";
 	if (options.distinct) sql += "DISTINCT ";
-	if (options.select) sql += `${options.select.map(escapeColname).join(", ")}`;
-	sql += ` FROM ${escapeColname(options.from)}`; // Always add FROM
-	if (options.join) {
+	if (options.select?.length)
+		sql += options.select.map(escapeColname).join(", ");
+	else sql += "*";
+
+	sql += ` FROM ${escapeColname(options.from)}`;
+
+	if (options.join?.length) {
 		for (const join of options.join) {
 			sql += ` ${join.type} JOIN ${escapeColname(join.table)}`;
 			if (join.alias) sql += ` AS ${escapeColname(join.alias)}`;
 			sql += ` ON ${join.on}`;
-			if (join.columns) sql += ` (${join.columns.map(escapeColname).join(", ")})`;
+			if (join.columns?.length)
+				sql += ` (${join.columns.map(escapeColname).join(", ")})`;
 		}
 	}
+
 	if (options.where) {
+		sql += " WHERE ";
 		if (typeof options.where === "string") {
-			sql += ` WHERE ${options.where}`;
+			sql += options.where;
 		} else {
-			const conditions = Object.keys(options.where)
-				.map(k => `${escapeColname(k)} = ?`)
-				.join(" AND ");
-			sql += ` WHERE ${conditions}`;
+			sql += parseWhere(options.where, params);
 		}
 	}
-	if (options.groupBy)
+
+	if (options.groupBy?.length)
 		sql += ` GROUP BY ${options.groupBy.map(escapeColname).join(", ")}`;
 	if (options.having) sql += ` HAVING ${options.having}`;
-	if (options.orderBy)
-		sql += ` ORDER BY ${options.orderBy.map(escapeColname).join(", ")}`;
-	if (options.limit) sql += ` LIMIT ${options.limit}`;
-	if (options.offset) sql += ` OFFSET ${options.offset}`;
+	if (options.order?.length)
+		sql += ` ORDER BY ${options.order
+			.map(([col, dir]) => `${escapeColname(col)} ${dir}`)
+			.join(", ")}`;
 
-	yield sql;
+	if (options.limit !== undefined) sql += ` LIMIT ${options.limit}`;
+	if (options.offset !== undefined) sql += ` OFFSET ${options.offset}`;
+
+	if (options.union?.length) {
+		for (const { type, query } of options.union) {
+			sql += ` ${type} ${query}`;
+		}
+	}
+
+	if (options.window) sql += ` WINDOW ${options.window}`;
+	if (options.search) {
+		sql += ` /* SEARCH: ${options.search} */`;
+	}
+	if (options.explain) {
+		sql = `EXPLAIN ${sql}`;
+	}
+
+	yield { sql, params };
 }

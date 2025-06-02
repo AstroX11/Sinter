@@ -45,26 +45,10 @@ export function createTable(db, modelDefinition) {
 
 	if (modelDefinition.withoutRowid) sql += " WITHOUT ROWID";
 	if (modelDefinition.strict) sql += " STRICT";
-
-	console.log(sql);
-
+	
 	db.exec(sql);
 
-	db.exec(`
-		CREATE TABLE IF NOT EXISTS table_comments (
-			table_name TEXT PRIMARY KEY,
-			comment TEXT
-		)
-	`);
 
-	if (modelDefinition.comment) {
-		db.exec(
-			`INSERT OR REPLACE INTO table_comments (table_name, comment) VALUES ('${tableName}', '${modelDefinition.comment.replace(
-				/'/g,
-				"''"
-			)}')`
-		);
-	}
 
 	return { tableName, sql };
 }

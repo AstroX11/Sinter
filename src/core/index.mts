@@ -5,16 +5,17 @@ import Database, {
 } from "better-sqlite3";
 
 import { ModelRelationshipManager } from "../models/relationship.mjs";
+import { defineModel } from "../abstracts/_definitions.mjs";
+import { registerSqliteFunctions } from "../internals/index.js";
 import type {
-	QunatavaOptions,
-	QueryResult,
 	ModelDefinition,
 	RelationshipDefinition,
-} from "../types/index.mjs";
-import { registerSqliteFunctions } from "../internals/index.js";
+} from "../types/Model.mjs";
+import type { QueryResult, QunatavaOptions } from "../types/Base.mjs";
+import { ModelInstance } from "../abstracts/instance.mjs";
 
-class Quantava extends Database {
-	private modelManager: ModelRelationshipManager;
+class Qunatava extends Database {
+	private _relationshipManager: ModelRelationshipManager;
 
 	constructor(options: QunatavaOptions = {}) {
 		super(options.filename ?? ":memory:", {
@@ -23,9 +24,9 @@ class Quantava extends Database {
 			verbose: options.verbose,
 		});
 
-		registerSqliteFunctions(this)
+		registerSqliteFunctions(this);
 
-		this.modelManager = new ModelRelationshipManager();
+		this._relationshipManager = new ModelRelationshipManager();
 	}
 
 	query<T = unknown, P extends unknown[] = unknown[]>(
@@ -61,14 +62,35 @@ class Quantava extends Database {
 		modelName: string,
 		relationships: RelationshipDefinition[]
 	): this {
-		this.modelManager.defineRelationships(modelName, relationships);
+		this._relationshipManager.defineRelationships(modelName, relationships);
 		return this;
 	}
 
-	getModel(modelName: string): ModelDefinition | undefined {
-		return this.modelManager.getModel(modelName);
+	getModel(_modelName: string): ModelDefinition | undefined {
+		return undefined;
+	}
+
+	define(
+		modelName: string,
+		columns: ModelDefinition["columns"] = {},
+		options: Partial<Omit<ModelDefinition, "columns" | "name">> = {}
+	): ModelInstance {
+		const modelDefinition = defineModel(this, {
+			name: modelName,
+			columns,
+			...options,
+		});
+		return new ModelInstance(this, modelDefinition);
+	}
+
+	only(): this {
+		return this;
+	}
+
+	empty(): this {
+		return this;
 	}
 }
 
-export { Quantava };
-export default Quantava;
+export { Qunatava };
+export default Qunatava;

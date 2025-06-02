@@ -18,7 +18,6 @@ export interface ModelDefinition {
 	timestamps?: boolean;
 	underscored?: boolean;
 	displayName?: string;
-	comment?: string;
 	virtualFields?: Record<string, (row: Record<string, unknown>) => unknown>;
 	beforeInsert?: (
 		data: Record<string, unknown>
@@ -36,6 +35,7 @@ export interface ColumnDefinition {
 	name?: string;
 	type: string;
 	primaryKey?: boolean;
+	allowNull?: boolean;
 	notNull?: boolean;
 	unique?: boolean;
 	autoIncrement?: boolean;
@@ -69,7 +69,6 @@ export interface ColumnDefinition {
 	deprecated?: boolean;
 	hiddenInSelect?: boolean;
 	index?: boolean;
-	comment?: string;
 }
 
 export interface ForeignKeyReference {
@@ -81,7 +80,6 @@ export interface ForeignKeyReference {
 	deferrable?: boolean;
 	initiallyDeferred?: boolean;
 	name?: string;
-	comment?: string;
 }
 
 export interface RelationshipDefinition {

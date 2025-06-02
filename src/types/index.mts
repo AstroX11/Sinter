@@ -1,2 +1,3 @@
-export type * from './Base.mjs'
-export type * from './Model.mjs'
+export * from './Base.mjs'
+export * from './Instance.mjs'
+export * from './Model.mjs'
