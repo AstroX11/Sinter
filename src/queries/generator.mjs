@@ -1,5 +1,6 @@
 import { escapeColname } from "../utils/escape.js";
 import { parseWhere } from "../utils/whereParser.js";
+import { processColumnValue } from "./column_functions.mjs";
 import { mapDataTypeToSQLiteType } from "./mappers.mjs";
 
 export function* queryGenerator(db, queries) {
@@ -8,33 +9,46 @@ export function* queryGenerator(db, queries) {
 	}
 }
 
-export function* columnGenerator(columns) {
+export function* columnGenerator(columns, row = {}, previousRow = {}) {
 	for (const [name, config] of Object.entries(columns)) {
+		const processedValue = processColumnValue(
+			config,
+			row[name],
+			row,
+			previousRow[name]
+		);
 		let sqliteType = mapDataTypeToSQLiteType(config.type);
+
 		if (config.length && (sqliteType === "CHAR" || sqliteType === "VARCHAR")) {
 			sqliteType += `(${config.length})`;
 		}
+
 		let def = `${escapeColname(name)} ${sqliteType}`;
+
 		if (config.primaryKey) def += " PRIMARY KEY";
 		if (config.autoIncrement && config.primaryKey && sqliteType === "INTEGER")
 			def += " AUTOINCREMENT";
 		if (config.allowNull === false || config.notNull || config.required)
 			def += " NOT NULL";
 		if (config.unique) def += " UNIQUE";
-		if (config.defaultValue !== undefined && config.defaultValue !== null) {
-			const dv = config.defaultValue;
-			if (typeof dv === "string") {
-				def += ` DEFAULT '${dv.replace(/'/g, "''")}'`;
-			} else if (typeof dv === "number" || typeof dv === "boolean") {
-				def += ` DEFAULT ${+dv}`;
-			} else if (typeof dv === "object") {
-				const jsonStr = JSON.stringify(dv).replace(/'/g, "''");
+
+		if (processedValue !== undefined && processedValue !== null) {
+			if (typeof processedValue === "string") {
+				def += ` DEFAULT '${processedValue.replace(/'/g, "''")}'`;
+			} else if (
+				typeof processedValue === "number" ||
+				typeof processedValue === "boolean"
+			) {
+				def += ` DEFAULT ${+processedValue}`;
+			} else if (typeof processedValue === "object") {
+				const jsonStr = JSON.stringify(processedValue).replace(/'/g, "''");
 				def += ` DEFAULT '${jsonStr}'`;
 			} else {
-				const literal = String(dv).replace(/'/g, "''");
+				const literal = String(processedValue).replace(/'/g, "''");
 				def += ` DEFAULT '${literal}'`;
 			}
 		}
+
 		if (config.defaultExpression) def += ` DEFAULT (${config.defaultExpression})`;
 		if (config.check) def += ` CHECK (${config.check})`;
 		if (config.collate) def += ` COLLATE ${config.collate}`;
@@ -49,6 +63,7 @@ export function* columnGenerator(columns) {
 				.map(v => `'${v}'`)
 				.join(", ")}))`;
 		}
+
 		yield {
 			sql: def,
 			metadata: {

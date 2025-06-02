@@ -7,14 +7,17 @@ import Database, {
 import { ModelRelationshipManager } from "../models/relationship.mjs";
 import { defineModel } from "../abstracts/_definitions.mjs";
 import { registerSqliteFunctions } from "../internals/index.js";
-import type {
-	ModelDefinition,
-	RelationshipDefinition,
-} from "../types/Model.mjs";
-import type { QueryResult, QunatavaOptions } from "../types/Base.mjs";
 import { ModelInstance } from "../abstracts/instance.mjs";
 
-class Qunatava extends Database {
+import type {
+	ColumnDefinition,
+	ModelDefinition,
+	RelationshipDefinition,
+	QueryResult,
+	QunatavaOptions,
+} from "../index.mjs";
+
+export class Qunatava extends Database {
 	private _relationshipManager: ModelRelationshipManager;
 
 	constructor(options: QunatavaOptions = {}) {
@@ -70,9 +73,9 @@ class Qunatava extends Database {
 		return undefined;
 	}
 
-	define(
+	define<TColumns extends Record<string, ColumnDefinition>>(
 		modelName: string,
-		columns: ModelDefinition["columns"] = {},
+		columns: TColumns,
 		options: Partial<Omit<ModelDefinition, "columns" | "name">> = {}
 	): ModelInstance {
 		const modelDefinition = defineModel(this, {
@@ -82,15 +85,4 @@ class Qunatava extends Database {
 		});
 		return new ModelInstance(this, modelDefinition);
 	}
-
-	only(): this {
-		return this;
-	}
-
-	empty(): this {
-		return this;
-	}
 }
-
-export { Qunatava };
-export default Qunatava;

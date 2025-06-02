@@ -13,6 +13,15 @@ export function createTable(db, modelDefinition) {
 			: modelDefinition.name
 		).toLowerCase();
 
+	const checkStmt = db.prepare(
+		`SELECT name FROM sqlite_master WHERE type='table' AND name=?`
+	);
+	const tableExists = checkStmt.get(tableName);
+
+	if (tableExists) {
+		return { tableName, sql: null };
+	}
+
 	if (modelDefinition.computedProperties) {
 		for (const prop of modelDefinition.computedProperties) {
 			modelDefinition.columns[prop.name] = {
@@ -45,10 +54,8 @@ export function createTable(db, modelDefinition) {
 
 	if (modelDefinition.withoutRowid) sql += " WITHOUT ROWID";
 	if (modelDefinition.strict) sql += " STRICT";
-	
+
 	db.exec(sql);
-
-
 
 	return { tableName, sql };
 }

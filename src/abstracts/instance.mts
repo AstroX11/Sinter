@@ -1,4 +1,4 @@
-import type { Qunatava } from "../index.mjs";
+import { createTable, type Qunatava } from "../index.mjs";
 import type {
 	ModelDefinition,
 	WhereClause,
@@ -27,6 +27,12 @@ export class ModelInstance {
 		const params: unknown[] = [];
 		const sql = parseWhere(where, params);
 		return { sql: sql ? `WHERE ${sql}` : "", params };
+	}
+
+	async sync(force?: boolean) {
+		if (!force) return;
+		await this.truncate();
+		return createTable(this.db, this.model);
 	}
 
 	async findOne<T = Record<string, unknown>>(
