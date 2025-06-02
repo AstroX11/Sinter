@@ -18,10 +18,8 @@ export function* columnGenerator(columns) {
 		if (config.primaryKey) def += " PRIMARY KEY";
 		if (config.autoIncrement && config.primaryKey && sqliteType === "INTEGER")
 			def += " AUTOINCREMENT";
-
 		if (config.allowNull === false || config.notNull || config.required)
 			def += " NOT NULL";
-
 		if (config.unique) def += " UNIQUE";
 		if (config.defaultValue !== undefined && config.defaultValue !== null) {
 			const dv = config.defaultValue;

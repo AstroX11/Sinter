@@ -60,7 +60,11 @@ export class ModelInstance {
 	async findByPk<T = Record<string, unknown>>(
 		pk: number | string
 	): Promise<T | null> {
-		return this.findOne<T>({ where: { id: pk } });
+		const pragmaQuery = `PRAGMA table_info(${this.model.tableName})`;
+		const result = this.db.query<{ name: string; pk: number }>(pragmaQuery);
+		const pkColumn = result.rows.find(row => row.pk === 1)?.name;
+		if (!pkColumn) return null;
+		return this.findOne<T>({ where: { [pkColumn]: pk } });
 	}
 
 	async create<T extends Record<string, unknown>>(
@@ -75,10 +79,18 @@ export class ModelInstance {
 		const query = `INSERT ${options.ignoreDuplicates ? "OR IGNORE" : ""} INTO ${
 			this.model.tableName
 		} (${keys.join(", ")}) VALUES (${placeholders})`;
+
 		const result = this.db.query(query, values);
-		if (result.lastInsertRowid) {
-			return this.findByPk<T>(result.lastInsertRowid as number).then(row => row!);
+
+		const pragmaQuery = `PRAGMA table_info(${this.model.tableName})`;
+		const pragmaResult = this.db.query<{ name: string; pk: number }>(pragmaQuery);
+		const pkColumn = pragmaResult.rows.find(row => row.pk === 1)?.name;
+
+		if (pkColumn && result.lastInsertRowid) {
+			const found = await this.findByPk<T>(result.lastInsertRowid as number);
+			if (found) return found;
 		}
+
 		return processedData as T;
 	}
 
@@ -166,10 +178,15 @@ export class ModelInstance {
 		options: CreateOptions = {}
 	): Promise<T[]> {
 		const results: T[] = [];
+
 		for (const record of records) {
-			const created = await this.create<T>(record, options);
+			const data = options.beforeInsert
+				? (options.beforeInsert(record) as T)
+				: record;
+			const created = await this.create<T>(data, options);
 			results.push(created);
 		}
+
 		return results;
 	}
 }

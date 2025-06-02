@@ -1,7 +1,6 @@
 import { Qunatava } from "../index.mjs";
 import { createTable } from "../queries/create_table.mjs";
 import type { ModelDefinition } from "../types/Model.mjs";
-import { DataTypes } from "../models/datatypes.mjs";
 
 export function defineModel(
 	db: Qunatava,
@@ -16,16 +15,10 @@ export function defineModel(
 				: modelDefinition.name
 			).toLowerCase(),
 		pluralizeTablename: modelDefinition.pluralizeTablename ?? true,
-		columns: modelDefinition.columns || {
-			id: {
-				type: DataTypes.INTEGER,
-				primaryKey: true,
-				autoIncrement: true,
-			},
-		},
+		columns: modelDefinition.columns,
 		relationships: modelDefinition.relationships,
 		indexes: modelDefinition.indexes,
-		constraints: modelDefinition.constraints,
+		constraints: modelDefinition.constraints || [],
 		triggers: modelDefinition.triggers,
 		views: modelDefinition.views,
 		withoutRowid: modelDefinition.withoutRowid ?? false,
