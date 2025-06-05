@@ -1,3 +1,4 @@
+import Quantava from "../index.mjs";
 import { escapeColname } from "../utils/escape.js";
 import {
 	columnGenerator,
@@ -5,6 +6,12 @@ import {
 	constraintsGenerator,
 } from "./generator.mjs";
 
+/**
+ *
+ * @param {Quantava} db
+ * @param {import("../index.mjs").ModelDefinition} modelDefinition
+ * @returns
+ */
 export function createTable(db, modelDefinition) {
 	const tableName =
 		modelDefinition.tableName ||

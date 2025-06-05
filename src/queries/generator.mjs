@@ -16,8 +16,9 @@ export function* queryGenerator(db, queries) {
 }
 
 /**
- *
- * @param {import("../index.mjs").ColumnDefinition} columns
+ * Generates SQL column definitions from a map of column configurations.
+ * @param {Object.<string, import("../index.mjs").ColumnDefinition>} columns - A map of column names to their configurations.
+ * @yields {{ sql: string, metadata: { index?: boolean, description?: string, deprecated?: boolean, hidden?: boolean, hiddenInSelect?: boolean immutable?: boolean }}}
  */
 export function* columnGenerator(columns) {
 	for (const [name, config] of Object.entries(columns)) {
@@ -84,8 +85,8 @@ export function* columnGenerator(columns) {
 }
 
 /**
- *
- * @param {import("../index.mjs").RelationshipDefinition} relationships
+ * @param {import("../index.mjs").RelationshipDefinition[]} relationships
+ * @yields {string}
  */
 export function* foreignKeysGenerator(relationships) {
 	for (const rel of relationships) {
@@ -109,7 +110,7 @@ export function* foreignKeysGenerator(relationships) {
 
 /**
  *
- * @param {import("../index.mjs").IndexDefinition} indexes
+ * @param {import("../index.mjs").IndexDefinition[]} indexes
  */
 export function* indexesGenerator(indexes) {
 	for (const index of indexes) {
@@ -129,7 +130,7 @@ export function* indexesGenerator(indexes) {
 
 /**
  *
- * @param {import("../index.mjs").ConstraintDefinition} constraints
+ * @param {import("../index.mjs").ConstraintDefinition[]} constraints
  */
 export function* constraintsGenerator(constraints) {
 	for (const constraint of constraints) {
@@ -157,6 +158,10 @@ export function* constraintsGenerator(constraints) {
 	}
 }
 
+/**
+ *
+ * @param {import("../index.mjs").TriggerDefinition[]} triggers
+ */
 export function* triggersGenerator(triggers) {
 	for (const trigger of triggers) {
 		let sql = `CREATE TRIGGER ${escapeColname(trigger.name)} ${trigger.timing} ${
@@ -171,7 +176,7 @@ export function* triggersGenerator(triggers) {
 
 /**
  *
- * @param {import("../index.mjs").ViewDefinition} views
+ * @param {import("../index.mjs").ViewDefinition[]} views
  */
 export function* viewsGenerator(views) {
 	for (const view of views) {
@@ -193,6 +198,10 @@ export function* hooksGenerator(hooks, modelName) {
 	}
 }
 
+/**
+ *
+ * @param {import("../index.mjs").ComputedProperty[]} computedProperties
+ */
 export function* computedPropertiesGenerator(computedProperties) {
 	for (const prop of computedProperties) {
 		let sql = `${escapeColname(prop.name)} AS (${prop.expression})`;
@@ -202,71 +211,94 @@ export function* computedPropertiesGenerator(computedProperties) {
 }
 
 /**
- *
  * @param {import("../index.mjs").QueryOptions} options
+ * @yields {string}
  */
 export function* queryOptionsGenerator(options) {
-	if (!options.from)
+	if (!options.from) {
 		throw new Error(
 			"Missing 'from' in query options. 'FROM' clause is mandatory."
 		);
+	}
 
 	let sql = "";
 	const params = [];
 
-	if (options.with?.length) sql += `WITH ${options.with.join(", ")} `;
+	if (options.with?.length) {
+		sql += `WITH ${options.with.join(", ")} `;
+	}
 
 	sql += "SELECT ";
-	if (options.distinct) sql += "DISTINCT ";
-	if (options.select?.length)
+	if (options.distinct) {
+		sql += "DISTINCT ";
+	}
+	if (options.select?.length) {
 		sql += options.select.map(escapeColname).join(", ");
-	else sql += "*";
+	} else {
+		sql += "*";
+	}
 
-	sql += ` FROM ${escapeColname(options.from)}`;
+	sql += ` FROM ${
+		Array.isArray(options.from)
+			? options.from.map(escapeColname).join(", ")
+			: escapeColname(options.from)
+	}`;
 
 	if (options.join?.length) {
 		for (const join of options.join) {
 			sql += ` ${join.type} JOIN ${escapeColname(join.table)}`;
-			if (join.alias) sql += ` AS ${escapeColname(join.alias)}`;
+			if (join.alias) {
+				sql += ` AS ${escapeColname(join.alias)}`;
+			}
 			sql += ` ON ${join.on}`;
-			if (join.columns?.length)
-				sql += ` (${join.columns.map(escapeColname).join(", ")})`;
 		}
 	}
 
 	if (options.where) {
-		sql += " WHERE ";
-		if (typeof options.where === "string") {
-			sql += options.where;
-		} else {
-			sql += parseWhere(options.where, params);
-		}
+		sql += ` WHERE ${
+			typeof options.where === "string"
+				? options.where
+				: Object.entries(options.where)
+						.map(([key, _]) => `${escapeColname(key)} = ?`)
+						.join(" AND ")
+		}`;
 	}
 
-	if (options.groupBy?.length)
+	if (options.groupBy?.length) {
 		sql += ` GROUP BY ${options.groupBy.map(escapeColname).join(", ")}`;
-	if (options.having) sql += ` HAVING ${options.having}`;
-	if (options.order?.length)
+	}
+
+	if (options.having) {
+		sql += ` HAVING ${options.having}`;
+	}
+
+	if (options.order?.length) {
 		sql += ` ORDER BY ${options.order
 			.map(([col, dir]) => `${escapeColname(col)} ${dir}`)
 			.join(", ")}`;
+	}
 
-	if (options.limit !== undefined) sql += ` LIMIT ${options.limit}`;
-	if (options.offset !== undefined) sql += ` OFFSET ${options.offset}`;
+	if (options.limit !== undefined) {
+		sql += ` LIMIT ${options.limit}`;
+	}
+
+	if (options.offset !== undefined) {
+		sql += ` OFFSET ${options.offset}`;
+	}
+
+	if (options.window) {
+		sql += ` WINDOW ${options.window}`;
+	}
+
+	if (options.explain) {
+		sql += `EXPLAIN QUERY PLAN ${sql}`;
+	}
 
 	if (options.union?.length) {
-		for (const { type, query } of options.union) {
-			sql += ` ${type} ${query}`;
+		for (const union of options.union) {
+			sql += ` ${union.type} ${union.query}`;
 		}
 	}
 
-	if (options.window) sql += ` WINDOW ${options.window}`;
-	if (options.search) {
-		sql += ` /* SEARCH: ${options.search} */`;
-	}
-	if (options.explain) {
-		sql = `EXPLAIN ${sql}`;
-	}
-
-	yield { sql, params };
+	yield sql;
 }

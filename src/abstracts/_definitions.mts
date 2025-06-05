@@ -30,6 +30,7 @@ export function defineModel(
 		underscored: modelDefinition.underscored ?? false,
 		displayName: modelDefinition.displayName,
 		virtualFields: modelDefinition.virtualFields,
+		computedProperties: modelDefinition.computedProperties,
 		beforeInsert: modelDefinition.beforeInsert,
 		afterInsert: modelDefinition.afterInsert,
 		beforeUpdate: modelDefinition.beforeUpdate,

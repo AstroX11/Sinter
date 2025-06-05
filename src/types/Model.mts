@@ -19,6 +19,7 @@ export interface ModelDefinition {
 	underscored?: boolean;
 	displayName?: string;
 	virtualFields?: Record<string, (row: Record<string, unknown>) => unknown>;
+	computedProperties: ComputedProperty[]
 	beforeInsert?: (
 		data: Record<string, unknown>
 	) => Record<string, unknown> | Promise<Record<string, unknown>>;
@@ -314,9 +315,13 @@ export interface RelationshipDefinition {
 	eagerLoad?: boolean;
 	constraintName?: string;
 	joinType?: "INNER" | "LEFT" | "RIGHT";
+	deferrable?: boolean;
+	initiallyDeferred?: boolean;
+	comment?: string;
 }
 
 export interface IndexDefinition {
+	table: string;
 	name: string;
 	columns: string[];
 	unique?: boolean;
@@ -381,12 +386,21 @@ export type HookFunction = (model: any, options?: any) => Promise<void> | void;
 
 export interface ComputedProperty {
 	name: string;
+	type: string
 	dependencies: string[];
 	expression: string;
 	stored?: boolean;
 }
+export interface JoinClause {
+	type: "INNER" | "LEFT" | "RIGHT";
+	table: string;
+	alias?: string;
+	on: string;
+}
+
 export interface QueryOptions {
 	select?: string[];
+	from: string | string[];
 	where?: Record<string, unknown> | string;
 	whereParams?: Record<string, unknown>;
 	limit?: number;
@@ -403,15 +417,6 @@ export interface QueryOptions {
 	window?: string;
 	explain?: boolean;
 }
-
-export interface JoinClause {
-	type: "INNER" | "LEFT";
-	table: string;
-	on: string;
-	alias?: string;
-	columns?: string[];
-}
-
 export interface ShadowField {
 	name: string;
 	type: string;
