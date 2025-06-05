@@ -89,9 +89,10 @@ export class ModelInstance {
 		const preprocessedData = beforeInsert ? await beforeInsert(data) : data;
 
 		const processedData = this.processData(preprocessedData);
-
-		const keys = Object.keys(processedData);
-		const values = Object.values(processedData);
+		const keys = Object.keys(processedData).filter(
+			key => processedData[key] !== undefined
+		);
+		const values = Object.values(processedData).filter(val => val !== undefined);
 		const placeholders = keys.map(() => "?").join(", ");
 		const query = `INSERT ${options.ignoreDuplicates ? "OR IGNORE" : ""} INTO ${
 			this.model.tableName
@@ -107,7 +108,6 @@ export class ModelInstance {
 			const found = await this.findByPk<T>(result.lastInsertRowid as number);
 			if (found) return found;
 		}
-
 		return processedData as T;
 	}
 
@@ -219,5 +219,41 @@ export class ModelInstance {
 		}
 
 		return results;
+	}
+
+	async upsert<T extends Record<string, unknown>>(
+		data: T,
+		options: CreateOptions & {
+			where?: WhereClause;
+			conflictFields?: string[];
+		} = {}
+	): Promise<T> {
+		const {
+			where = {},
+			conflictFields = [],
+			ignoreDuplicates,
+			beforeInsert,
+		} = options;
+		let searchCondition: WhereClause = where;
+		if (conflictFields.length > 0) {
+			searchCondition = conflictFields.reduce((acc, field) => {
+				if (field in data) {
+					acc[field] = data[field];
+				}
+				return acc;
+			}, {} as WhereClause);
+		}
+		const existingRecord = await this.findOne<T>({ where: searchCondition });
+		if (existingRecord) {
+			await this.update<T>(data, { where: searchCondition });
+			const updatedRecord = await this.findOne<T>({ where: searchCondition });
+			return updatedRecord || data;
+		}
+
+		const createdRecord = await this.create<T>(data, {
+			ignoreDuplicates,
+			beforeInsert,
+		});
+		return createdRecord;
 	}
 }
