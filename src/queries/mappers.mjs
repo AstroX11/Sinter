@@ -29,6 +29,7 @@ export function convertValueToDataType(value, dataType, enumValues = []) {
 	if (value === undefined || value === null) {
 		return dataType === "NULL" ? null : value;
 	}
+
 	switch (dataType) {
 		case "INTEGER":
 			return Number.isFinite(parseInt(String(value)))
@@ -45,25 +46,23 @@ export function convertValueToDataType(value, dataType, enumValues = []) {
 		case "UUID":
 			return String(value);
 		case "ENUM":
-			if (enumValues.includes(String(value))) {
-				return String(value);
-			}
-			return enumValues.length > 0 ? enumValues[0] : null;
+			return enumValues.includes(String(value))
+				? String(value)
+				: enumValues.length > 0
+				? enumValues[0]
+				: null;
 		case "BLOB":
-			return value instanceof Buffer ? value : Buffer.from(String(value));
+			return value instanceof Buffer ? value : Buffer.from(JSON.stringify(value));
 		case "BOOLEAN":
 			return Boolean(value) ? 1 : 0;
 		case "DATE":
 		case "DATETIME":
-			if (value instanceof Date) {
-				return value.getTime();
-			}
 			const parsedDate = new Date(String(value));
 			return Number.isFinite(parsedDate.getTime()) ? parsedDate.getTime() : null;
 		case "JSON":
-			return typeof value === "object" ? JSON.stringify(value) : String(value);
+			return JSON.stringify(value);
 		case "ARRAY":
-			return Array.isArray(value) ? JSON.stringify(value) : String(value);
+			return JSON.stringify(value);
 		case "NULL":
 			return null;
 		default:

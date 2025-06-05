@@ -86,3 +86,5 @@ export class Qunatava extends Database {
 		return new ModelInstance(this, modelDefinition);
 	}
 }
+
+export default Qunatava

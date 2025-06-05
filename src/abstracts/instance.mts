@@ -86,7 +86,7 @@ export class ModelInstance {
 		options: CreateOptions = {}
 	): Promise<T> {
 		const { beforeInsert } = this.model;
-		const preprocessedData = beforeInsert ? beforeInsert(data) : data;
+		const preprocessedData = beforeInsert ? await beforeInsert(data) : data;
 
 		const processedData = this.processData(preprocessedData);
 
@@ -184,7 +184,7 @@ export class ModelInstance {
 		const existingRows = await this.findAll<T>({ where });
 		if (!existingRows.length) return 0;
 
-		const updates: Partial<T> = beforeUpdate ? beforeUpdate(data) : data;
+		const updates = beforeUpdate ? beforeUpdate(data) : data;
 
 		for (const previousRow of existingRows) {
 			const processedData = this.processData(
@@ -194,9 +194,9 @@ export class ModelInstance {
 			const keys = Object.keys(processedData);
 			const values = Object.values(processedData);
 			const setClause = keys.map(key => `${key} = ?`).join(", ");
-			const { sql: whereSql, params } = this.buildWhereClause({
-				[this.model.primaryKey]: previousRow[this.model.primaryKey],
-			});
+
+			const { sql: whereSql, params } = this.buildWhereClause(where);
+
 			const query = `UPDATE ${this.model.tableName} SET ${setClause} ${whereSql}`;
 			this.db.query(query, [...values, ...params]);
 		}

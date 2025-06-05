@@ -1,7 +1,12 @@
+import { convertValueToDataType } from "./mappers.mjs";
+
 /**
- * What does this do?
- * This file will contain functions
- * Made to run on the columns
+ *
+ * @param {import("../index.mjs").ColumnDefinition} column
+ * @param {any} value
+ * @param {object} row
+ * @param {unknown} previousValue
+ * @returns
  */
 export function processColumnValue(column, value, row, previousValue) {
 	let processed = value;
@@ -26,7 +31,13 @@ export function processColumnValue(column, value, row, previousValue) {
 
 	processed = applyTransformIn(column, processed);
 	processed = applySet(column, processed, row);
-	processed = coerceAffinity(column, processed);
+
+	processed = convertValueToDataType(
+		processed,
+		column.type,
+		column.enumValues || []
+	);
+
 	processed = enforceEnum(column, processed);
 	applyValidation(column, processed);
 	processed = applyTransformOut(column, processed);
@@ -35,6 +46,11 @@ export function processColumnValue(column, value, row, previousValue) {
 	return processed;
 }
 
+/**
+ *
+ * @param {import("../index.mjs").ColumnDefinition} column
+ * @returns
+ */
 function resolveDefault(column) {
 	if (column.defaultFn) {
 		return column.defaultFn();
@@ -42,33 +58,33 @@ function resolveDefault(column) {
 	return column.defaultValue;
 }
 
+/**
+ *
+ * @param {import("../index.mjs").ColumnDefinition} column
+ * @param {*} value
+ * @returns
+ */
 function applyTransformIn(column, value) {
 	return column.transformIn ? column.transformIn(value) : value;
 }
 
+/**
+ *
+ * @param {import("../index.mjs").ColumnDefinition} column
+ * @param {*} value
+ * @param {*} row
+ * @returns
+ */
 function applySet(column, value, row) {
 	return column.set ? column.set(value, row) : value;
 }
 
-function coerceAffinity(column, value) {
-	if (value === undefined || value === null) return value;
-
-	switch (column.affinity) {
-		case "TEXT":
-			return String(value);
-		case "INTEGER":
-			return parseInt(value, 10) || 0;
-		case "REAL":
-			return parseFloat(value) || 0;
-		case "BLOB":
-			return value;
-		case "NUMERIC":
-			return Number(value) || 0;
-		default:
-			return value;
-	}
-}
-
+/**
+ *
+ * @param {import("../index.mjs").ColumnDefinition} column
+ * @param {*} value
+ * @returns
+ */
 function enforceEnum(column, value) {
 	if (column.enumValues && !column.enumValues.includes(value)) {
 		throw new Error(
@@ -80,24 +96,48 @@ function enforceEnum(column, value) {
 	return value;
 }
 
+/**
+ *
+ * @param {import("../index.mjs").ColumnDefinition} column
+ * @param {*} value
+ */
 function applyValidation(column, value) {
 	if (column.validate) {
 		const result = column.validate(value);
-
 		if (result !== true) {
 			throw new Error(typeof result === "string" ? result : `Validation failed`);
 		}
 	}
 }
 
+/**
+ *
+ * @param {import("../index.mjs").ColumnDefinition} column
+ * @param {*} value
+ * @returns
+ */
 function applyTransformOut(column, value) {
 	return column.transformOut ? column.transformOut(value) : value;
 }
 
+/**
+ *
+ * @param {import("../index.mjs").ColumnDefinition} column
+ * @param {*} value
+ * @param {*} row
+ * @returns
+ */
 function applyGet(column, value, row) {
 	return column.get ? column.get(value, row) : value;
 }
 
+/**
+ *
+ * @param {import("../index.mjs").	ModelDefinition['columns']} columns
+ * @param {*} row
+ * @param {*} previousRow
+ * @returns
+ */
 export function processRow(columns, row, previousRow) {
 	const output = {};
 	for (const key of Object.keys(columns)) {
