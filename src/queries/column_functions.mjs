@@ -1,15 +1,32 @@
 import { convertValueToDataType } from "./mappers.mjs";
 
 /**
- *
- * @param {import("../index.mjs").ColumnDefinition} column
- * @param {any} value
- * @param {object} row
- * @param {unknown} previousValue
- * @returns
+ * Processes a single column value according to its definition.
+ * @param {import("../index.mjs").ColumnDefinition} column - The column definition.
+ * @param {any} value - The input value for the column.
+ * @param {object} row - The entire row being processed.
+ * @param {unknown} previousValue - The previous value of the column (for updates).
+ * @param {import("../index.mjs").ModelDefinition} [modelDefinition] - The model definition (optional, for timestamp handling).
+ * @returns {any} - The processed value.
  */
-export function processColumnValue(column, value, row, previousValue) {
+export function processColumnValue(
+	column,
+	value,
+	row,
+	previousValue,
+	modelDefinition
+) {
 	let processed = value;
+
+	// Handle updatedAt for updates when timestamps is undefined or true
+	if (
+		previousValue !== undefined && // Indicates an update
+		(modelDefinition?.timestamps === undefined ||
+			modelDefinition?.timestamps === true) &&
+		column.name === (modelDefinition?.updatedAtColumn || "updatedAt")
+	) {
+		processed = Date.now();
+	}
 
 	if (processed === undefined || processed === null) {
 		processed = resolveDefault(column);
@@ -47,9 +64,9 @@ export function processColumnValue(column, value, row, previousValue) {
 }
 
 /**
- *
- * @param {import("../index.mjs").ColumnDefinition} column
- * @returns
+ * Resolves the default value for a column.
+ * @param {import("../index.mjs").ColumnDefinition} column - The column definition.
+ * @returns {any} - The default value.
  */
 function resolveDefault(column) {
 	if (column.defaultFn) {
@@ -59,31 +76,31 @@ function resolveDefault(column) {
 }
 
 /**
- *
- * @param {import("../index.mjs").ColumnDefinition} column
- * @param {*} value
- * @returns
+ * Applies the transformIn function to a value.
+ * @param {import("../index.mjs").ColumnDefinition} column - The column definition.
+ * @param {*} value - The input value.
+ * @returns {*} - The transformed value.
  */
 function applyTransformIn(column, value) {
 	return column.transformIn ? column.transformIn(value) : value;
 }
 
 /**
- *
- * @param {import("../index.mjs").ColumnDefinition} column
- * @param {*} value
- * @param {*} row
- * @returns
+ * Applies the set function to a value.
+ * @param {import("../index.mjs").ColumnDefinition} column - The column definition.
+ * @param {*} value - The input value.
+ * @param {*} row - The row being processed.
+ * @returns {*} - The set value.
  */
 function applySet(column, value, row) {
 	return column.set ? column.set(value, row) : value;
 }
 
 /**
- *
- * @param {import("../index.mjs").ColumnDefinition} column
- * @param {*} value
- * @returns
+ * Enforces enum values for a column.
+ * @param {import("../index.mjs").ColumnDefinition} column - The column definition.
+ * @param {*} value - The input value.
+ * @returns {*} - The validated value.
  */
 function enforceEnum(column, value) {
 	if (column.enumValues && !column.enumValues.includes(value)) {
@@ -97,9 +114,9 @@ function enforceEnum(column, value) {
 }
 
 /**
- *
- * @param {import("../index.mjs").ColumnDefinition} column
- * @param {*} value
+ * Applies validation to a column value.
+ * @param {import("../index.mjs").ColumnDefinition} column - The column definition.
+ * @param {*} value - The input value.
  */
 function applyValidation(column, value) {
 	if (column.validate) {
@@ -111,40 +128,47 @@ function applyValidation(column, value) {
 }
 
 /**
- *
- * @param {import("../index.mjs").ColumnDefinition} column
- * @param {*} value
- * @returns
+ * Applies the transformOut function to a value.
+ * @param {import("../index.mjs").ColumnDefinition} column - The column definition.
+ * @param {*} value - The input value.
+ * @returns {*} - The transformed value.
  */
 function applyTransformOut(column, value) {
 	return column.transformOut ? column.transformOut(value) : value;
 }
 
 /**
- *
- * @param {import("../index.mjs").ColumnDefinition} column
- * @param {*} value
- * @param {*} row
- * @returns
+ * Applies the get function to a value.
+ * @param {import("../index.mjs").ColumnDefinition} column - The column definition.
+ * @param {*} value - The input value.
+ * @param {*} row - The row being processed.
+ * @returns {*} - The retrieved value.
  */
 function applyGet(column, value, row) {
 	return column.get ? column.get(value, row) : value;
 }
 
 /**
- *
- * @param {import("../index.mjs").	ModelDefinition['columns']} columns
- * @param {*} row
- * @param {*} previousRow
- * @returns
+ * Processes an entire row according to its column definitions.
+ * @param {import("../index.mjs").ModelDefinition['columns']} columns - The column definitions.
+ * @param {*} row - The input row to process.
+ * @param {*} previousRow - The previous row (for updates).
+ * @param {import("../index.mjs").ModelDefinition} [modelDefinition] - The model definition (optional, for timestamp handling).
+ * @returns {Object} - The processed row.
  */
-export function processRow(columns, row, previousRow) {
+export function processRow(columns, row, previousRow, modelDefinition) {
 	const output = {};
 	for (const key of Object.keys(columns)) {
 		const colDef = columns[key];
 		const inputValue = row[key];
 		const previousValue = previousRow ? previousRow[key] : undefined;
-		output[key] = processColumnValue(colDef, inputValue, row, previousValue);
+		output[key] = processColumnValue(
+			colDef,
+			inputValue,
+			row,
+			previousValue,
+			modelDefinition
+		);
 	}
 	return output;
 }

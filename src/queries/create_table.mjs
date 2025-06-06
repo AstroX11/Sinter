@@ -7,10 +7,10 @@ import {
 } from "./generator.mjs";
 
 /**
- *
- * @param {Quantava} db
- * @param {import("../index.mjs").ModelDefinition} modelDefinition
- * @returns
+ * Creates a table in the database based on the model definition.
+ * @param {Quantava} db - The Quantava database instance.
+ * @param {import("../index.mjs").ModelDefinition} modelDefinition - The model definition.
+ * @returns {{ tableName: string, sql: string | null }} - The table name and executed SQL or null if table exists.
  */
 export function createTable(db, modelDefinition) {
 	const tableName =
@@ -35,6 +35,27 @@ export function createTable(db, modelDefinition) {
 				type: prop.type || "TEXT",
 				computedExpression: prop.expression,
 				stored: prop.stored,
+			};
+		}
+	}
+
+	if (
+		modelDefinition.timestamps === undefined ||
+		modelDefinition.timestamps === true
+	) {
+		const createdAtColumn = modelDefinition.createdAtColumn || "createdAt";
+		const updatedAtColumn = modelDefinition.updatedAtColumn || "updatedAt";
+
+		if (!modelDefinition.columns[createdAtColumn]) {
+			modelDefinition.columns[createdAtColumn] = {
+				type: "INTEGER",
+				defaultFn: () => Date.now(),
+			};
+		}
+		if (!modelDefinition.columns[updatedAtColumn]) {
+			modelDefinition.columns[updatedAtColumn] = {
+				type: "INTEGER",
+				defaultFn: () => Date.now(),
 			};
 		}
 	}
