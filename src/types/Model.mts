@@ -1,3 +1,5 @@
+import { ModelInstance } from "../abstracts/instance.mjs";
+
 export interface ModelDefinition {
 	name: string;
 	tableName?: string;
@@ -19,7 +21,7 @@ export interface ModelDefinition {
 	underscored?: boolean;
 	displayName?: string;
 	virtualFields?: Record<string, (row: Record<string, unknown>) => unknown>;
-	computedProperties: ComputedProperty[]
+	computedProperties: ComputedProperty[];
 	beforeInsert?: (
 		data: Record<string, unknown>
 	) => Record<string, unknown> | Promise<Record<string, unknown>>;
@@ -32,292 +34,179 @@ export interface ModelDefinition {
 	afterDelete?: (data: Record<string, unknown>) => void | Promise<void>;
 }
 
-export interface ColumnDefinition {
-	/**
-	 * Human-readable or programmatic name of the column.
-	 * If not set explicitly, it will usually be inferred from the object key during table creation.
-	 * @example "email"
-	 */
-	name?: string;
-
-	/**
-	 * Data type of the column, following the SQL type system or the library’s abstraction.
-	 * Examples include: "STRING", "INTEGER", "REAL", "BOOLEAN", "DATE".
-	 * @example "INTEGER"
-	 */
-	type: string;
-
-	/**
-	 * Marks the column as the primary key for the table.
-	 * Primary keys uniquely identify each row and can only be set on one or more columns in a table.
-	 * @example true
-	 */
-	primaryKey?: boolean;
-
-	/**
-	 * Allows the column to store NULL values.
-	 * If true, values may be NULL. If false, NULL is rejected at the database level.
-	 * @example true
-	 */
-	allowNull?: boolean;
-
-	/**
-	 * Shortcut for marking the column as NOT NULL (opposite of `allowNull`).
-	 * Forces every row to contain a non-NULL value in this column.
-	 * @example true
-	 */
-	notNull?: boolean;
-
-	/**
-	 * Ensures all values in this column are unique across the table.
-	 * Typically used for fields like email addresses or usernames.
-	 * @example true
-	 */
-	unique?: boolean;
-
-	/**
-	 * Enables automatic increment of numeric primary keys.
-	 * Useful for auto-generated IDs in tables.
-	 * @example true
-	 */
-	autoIncrement?: boolean;
-
-	/**
-	 * The static default value assigned if no explicit value is provided during inserts.
-	 * @example "pending"
-	 */
-	defaultValue?: unknown;
-
-	/**
-	 * A raw SQL expression used as the default value, e.g., "CURRENT_TIMESTAMP".
-	 * Use this when the default value must be evaluated by SQLite directly.
-	 * @example "CURRENT_TIMESTAMP"
-	 */
-	defaultExpression?: string;
-
-	/**
-	 * A JavaScript function returning the default value at runtime.
-	 * Offers dynamic defaults like timestamps or UUIDs.
-	 * @example () => Date.now()
-	 */
-	defaultFn?: () => unknown;
-
-	/**
-	 * A SQL `CHECK` constraint to validate values at the database level.
-	 * Ensures rows meet custom conditions (e.g., "age >= 18").
-	 * @example "age >= 18"
-	 */
-	check?: string;
-
-	/**
-	 * Defines the collation sequence for this column (text comparison and sorting).
-	 * SQLite supports "BINARY", "NOCASE", and "RTRIM" by default.
-	 * @example "NOCASE"
-	 */
-	collate?: string;
-
-	/**
-	 * Defines a foreign key relationship to another table’s column.
-	 * Used for relational integrity and joins.
-	 * @example { table: "roles", column: "id" }
-	 */
-	foreignKey?: ForeignKeyReference;
-
-	/**
-	 * SQL expression to generate computed or virtual columns.
-	 * Makes the column a calculated field, not stored directly.
-	 * @example "first_name || ' ' || last_name"
-	 */
-	generatedAs?: string;
-
-	/**
-	 * Marks this column to be excluded from JSON outputs (API responses, etc.).
-	 * Useful for sensitive data or internal-only fields.
-	 * @example true
-	 */
-	hidden?: boolean;
-
-	/**
-	 * Alternative name (alias) for this column, used during query building.
-	 * Can simplify queries or resolve naming conflicts.
-	 * @example "userEmail"
-	 */
-	alias?: string;
-
-	/**
-	 * Declares the column as virtual, meaning it is not stored in the database.
-	 * Virtual columns exist only in your data model and queries.
-	 * @example true
-	 */
-	virtual?: boolean;
-
-	/**
-	 * If true, stores the result of computed expressions physically in the table (SQLite 3.31+).
-	 * Otherwise, computed columns are recalculated on-the-fly.
-	 * @example true
-	 */
-	stored?: boolean;
-
-	/**
-	 * SQL expression that defines the computed value of this column.
-	 * Typically used with `virtual` or `stored` columns.
-	 * @example "price * quantity"
-	 */
-	computedExpression?: string;
-
-	/**
-	 * If true, indicates the computed column is stored (not virtual).
-	 * Otherwise, it’s recalculated dynamically.
-	 * @example true
-	 */
-	computedPersisted?: boolean;
-
-	/**
-	 * Forces how SQLite internally stores the data (e.g., TEXT, INTEGER).
-	 * Mainly relevant for advanced type tuning.
-	 * @example "TEXT"
-	 */
-	affinity?: "TEXT" | "INTEGER" | "REAL" | "BLOB" | "NUMERIC";
-
-	/**
-	 * Constrains this column to a list of allowed string values (ENUM-like behavior).
-	 * @example ["active", "pending", "inactive"]
-	 */
-	enumValues?: string[];
-
-	/**
-	 * Maximum character length for string columns.
-	 * Helps with schema clarity and validation.
-	 * @example 255
-	 */
-	length?: number;
-
-	/**
-	 * Number of digits in numeric columns.
-	 * Commonly used with `DECIMAL` or `NUMERIC` types.
-	 * @example 10
-	 */
-	precision?: number;
-
-	/**
-	 * Number of decimal places for numeric columns.
-	 * @example 2
-	 */
-	scale?: number;
-
-	/**
-	 * Custom transformation applied when reading this column’s value from the database.
-	 * Can be used for automatic casting or formatting.
-	 * @example (value) => value?.toUpperCase()
-	 */
-	get?: (value: unknown, row?: any) => unknown;
-
-	/**
-	 * Custom transformation applied before writing to the database.
-	 * Ideal for data sanitization (e.g., trimming whitespace).
-	 * @example (value) => value.trim()
-	 */
-	set?: (value: any, row?: any) => unknown;
-
-	/**
-	 * Function to validate the value before writing to the database.
-	 * Should return `true` or an error message string.
-	 * @example (email) => email.includes("@") || "Invalid email"
-	 */
-	validate?: (value: any) => boolean | string;
-
-	/**
-	 * Transform value before insertion or update at the database level.
-	 * Can adjust formatting or apply conversions.
-	 * @example (v) => v.toLowerCase()
-	 */
-	transformIn?: (value: any) => unknown;
-
-	/**
-	 * Transform value after reading from the database.
-	 * Great for consistent data output formatting.
-	 * @example (v) => v.toUpperCase()
-	 */
-	transformOut?: (value: unknown) => unknown;
-
-	/**
-	 * Indicates the column must always have a value set at the application level (logical requirement).
-	 * Unlike `allowNull`, this is enforced in application logic, not the database.
-	 * @example true
-	 */
-	required?: boolean;
-
-	/**
-	 * Prevents the column from being updated once set.
-	 * Useful for immutable fields like creation timestamps.
-	 * @example true
-	 */
-	immutable?: boolean;
-
-	/**
-	 * Marks this column as an alias for another column.
-	 * Useful when you want to remap names in your application layer.
-	 * @example "first_name"
-	 */
-	aliasFor?: string;
-
-	/**
-	 * Descriptive human-readable comment for this column.
-	 * Often used in documentation or admin UIs.
-	 * @example "The user's email address"
-	 */
-	description?: string;
-
-	/**
-	 * Marks this column as deprecated.
-	 * Can be used to phase out old schema fields.
-	 * @example true
-	 */
-	deprecated?: boolean;
-
-	/**
-	 * Excludes this column from SELECT queries by default.
-	 * Data still exists, but is hidden unless explicitly requested.
-	 * @example true
-	 */
-	hiddenInSelect?: boolean;
-
-	/**
-	 * Creates an index on this column to speed up queries and improve performance.
-	 * Recommended for frequently filtered or joined fields.
-	 * @example true
-	 */
-	index?: boolean;
-}
-
+/**
+ * Defines a foreign key reference to another table's column.
+ */
 export interface ForeignKeyReference {
-	table: string;
-	column: string;
+	/** Key of the rederenced model */
+	key: string;
+	/** Name of the referenced table. */
+	table?: string;
+	/** Name of the referenced column. */
+	column?: string;
+	/** Action to take on deletion of the referenced row. */
 	onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
+	/** Action to take on update of the referenced row. */
 	onUpdate?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
+	/** Match type for the foreign key constraint. */
 	match?: "FULL" | "SIMPLE" | "PARTIAL";
+	/** Whether the constraint can be deferred. */
 	deferrable?: boolean;
+	/** Whether the constraint is initially deferred. */
 	initiallyDeferred?: boolean;
+	/** Name of the foreign key constraint. */
 	name?: string;
+	/** Model instance to work with  */
+	model: ModelInstance;
 }
 
+/**
+ * Defines a relationship between models.
+ */
 export interface RelationshipDefinition {
+	/** Type of relationship. */
 	type: "one-to-one" | "one-to-many" | "many-to-one" | "many-to-many";
+	/** Name of the target model. */
 	targetModel: string;
+	/** Name of the foreign key column in the source model. */
 	foreignKey: string;
+	/** Name of the key column in the source model. */
 	sourceKey?: string;
+	/** Name of the junction table for many-to-many relationships. */
 	through?: string;
+	/** Foreign key in the junction table referencing the source model. */
 	throughForeignKey?: string;
+	/** Foreign key in the junction table referencing the target model. */
 	throughSourceKey?: string;
+	/** Action to take on deletion of the referenced row. */
 	onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
+	/** Action to take on update of the referenced row. */
 	onUpdate?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
+	/** Alias for the relationship in queries. */
 	as?: string;
+	/** Whether to eagerly load the related data. */
 	eagerLoad?: boolean;
+	/** Name of the constraint for the relationship. */
 	constraintName?: string;
+	/** Type of join to use in queries. */
 	joinType?: "INNER" | "LEFT" | "RIGHT";
+	/** Whether the constraint can be deferred. */
 	deferrable?: boolean;
+	/** Whether the constraint is initially deferred. */
 	initiallyDeferred?: boolean;
+	/** Comment describing the relationship. */
 	comment?: string;
+}
+
+/**
+ * Defines a table constraint.
+ */
+export interface ConstraintDefinition {
+	/** Name of the constraint. */
+	name?: string;
+	/** Type of constraint. */
+	type: "check" | "foreignKey" | "unique" | "primaryKey";
+	/** Expression for check constraints. */
+	expression?: string;
+	/** Columns included in the constraint. */
+	columns?: string[];
+	/** Reference details for foreign key constraints. */
+	references?: {
+		/** Referenced table. */
+		table: string;
+		/** Referenced columns. */
+		columns: string[];
+		/** Model instance to work with  */
+		model: ModelInstance;
+	};
+	/** Action to take on deletion of the referenced row. */
+	onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
+	/** Action to take on update of the referenced row. */
+	onUpdate?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
+	/** Whether the constraint can be deferred. */
+	deferrable?: boolean;
+	/** Whether the constraint is initially deferred. */
+	initiallyDeferred?: boolean;
+}
+
+/**
+ * Defines a column in a table.
+ */
+export interface ColumnDefinition {
+	/** Human-readable or programmatic name of the column, inferred from object key if not set. */
+	name?: string;
+	/** Data type of the column (e.g., STRING, INTEGER, REAL, BOOLEAN, DATE). */
+	type: string;
+	/** Marks the column as the primary key for the table. */
+	primaryKey?: boolean;
+	/** Allows the column to store NULL values. */
+	allowNull?: boolean;
+	/** Forces the column to be NOT NULL, rejecting NULL values. */
+	notNull?: boolean;
+	/** Ensures all values in the column are unique across the table. */
+	unique?: boolean;
+	/** Enables automatic increment for numeric primary keys. */
+	autoIncrement?: boolean;
+	/** Static default value assigned if no value is provided during inserts. */
+	defaultValue?: unknown;
+	/** Raw SQL expression used as the default value (e.g., CURRENT_TIMESTAMP). */
+	defaultExpression?: string;
+	/** JavaScript function returning a dynamic default value. */
+	defaultFn?: () => unknown;
+	/** SQL CHECK constraint to validate values (e.g., "age >= 18"). */
+	check?: string;
+	/** Collation sequence for text comparison and sorting (e.g., NOCASE). */
+	collate?: string;
+	/** Defines a foreign key relationship to another table’s column. */
+	references?: ForeignKeyReference;
+	/** SQL expression for computed or virtual columns (e.g., "first_name || ' ' || last_name"). */
+	generatedAs?: string;
+	/** Excludes the column from JSON outputs for sensitive or internal fields. */
+	hidden?: boolean;
+	/** Alternative name (alias) for the column in queries. */
+	alias?: string;
+	/** Marks the column as virtual, not stored in the database. */
+	virtual?: boolean;
+	/** Stores the computed column physically in the table (SQLite 3.31+). */
+	stored?: boolean;
+	/** SQL expression defining the computed value of the column. */
+	computedExpression?: string;
+	/** Indicates the computed column is stored, not recalculated dynamically. */
+	computedPersisted?: boolean;
+	/** SQLite internal storage type (e.g., TEXT, INTEGER). */
+	affinity?: "TEXT" | "INTEGER" | "REAL" | "BLOB" | "NUMERIC";
+	/** List of allowed string values for ENUM-like behavior. */
+	enumValues?: string[];
+	/** Maximum character length for string columns. */
+	length?: number;
+	/** Number of digits in numeric columns. */
+	precision?: number;
+	/** Number of decimal places for numeric columns. */
+	scale?: number;
+	/** Transforms the column’s value when read from the database. */
+	get?: (value: unknown, row?: any) => unknown;
+	/** Transforms the value before writing to the database. */
+	set?: (value: any, row?: any) => unknown;
+	/** Validates the value before writing, returning true or an error message. */
+	validate?: (value: any) => boolean | string;
+	/** Transforms the value before insertion or update. */
+	transformIn?: (value: any) => unknown;
+	/** Transforms the value after reading from the database. */
+	transformOut?: (value: unknown) => unknown;
+	/** Requires a value at the application level (logical requirement). */
+	required?: boolean;
+	/** Prevents updates to the column once set. */
+	immutable?: boolean;
+	/** Maps the column to another column as an alias. */
+	aliasFor?: string;
+	/** Descriptive comment for the column. */
+	description?: string;
+	/** Marks the column as deprecated for schema phasing out. */
+	deprecated?: boolean;
+	/** Excludes the column from default SELECT queries. */
+	hiddenInSelect?: boolean;
+	/** Creates an index on the column for query performance. */
+	index?: boolean;
 }
 
 export interface IndexDefinition {
@@ -341,6 +230,7 @@ export interface ConstraintDefinition {
 	references?: {
 		table: string;
 		columns: string[];
+		model: ModelInstance;
 	};
 	onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
 	onUpdate?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
@@ -386,7 +276,7 @@ export type HookFunction = (model: any, options?: any) => Promise<void> | void;
 
 export interface ComputedProperty {
 	name: string;
-	type: string
+	type: string;
 	dependencies: string[];
 	expression: string;
 	stored?: boolean;

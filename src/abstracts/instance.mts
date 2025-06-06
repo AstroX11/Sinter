@@ -37,6 +37,69 @@ export class ModelInstance {
 		return { sql: sql ? `WHERE ${sql}` : "", params };
 	}
 
+	/** Defines a one-to-one relationship with another model */
+	async hasOne<T = Record<string, unknown>>(
+		relatedModel: ModelInstance,
+		foreignKey: string,
+		localKey: string = "id"
+	): Promise<T | null> {
+		const { sql: whereSql, params } = this.buildWhereClause({
+			[foreignKey]: (await this.findOne())?.[localKey],
+		});
+		return relatedModel.findOne<T>({
+			where: whereSql ? { [foreignKey]: params[0] } : {},
+		});
+	}
+
+	/** Defines a belongs-to relationship with another model */
+	async belongsTo<T = Record<string, unknown>>(
+		relatedModel: ModelInstance,
+		foreignKey: string,
+		relatedKey: string = "id"
+	): Promise<T | null> {
+		const currentRecord = await this.findOne();
+		if (!currentRecord) return null;
+		return relatedModel.findOne<T>({
+			where: { [relatedKey]: currentRecord[foreignKey] },
+		});
+	}
+
+	/** Defines a one-to-many relationship with another model */
+	async hasMany<T = Record<string, unknown>>(
+		relatedModel: ModelInstance,
+		foreignKey: string,
+		localKey: string = "id"
+	): Promise<T[]> {
+		const currentRecord = await this.findOne();
+		if (!currentRecord) return [];
+		const { sql: whereSql, params } = this.buildWhereClause({
+			[foreignKey]: currentRecord[localKey],
+		});
+		return relatedModel.findAll<T>({
+			where: whereSql ? { [foreignKey]: params[0] } : {},
+		});
+	}
+
+	/** Defines a many-to-many relationship with another model through a junction table */
+	async belongsToMany<T = Record<string, unknown>>(
+		relatedModel: ModelInstance,
+		junctionTable: string,
+		foreignKey: string,
+		relatedForeignKey: string,
+		localKey: string = "id",
+		relatedKey: string = "id"
+	): Promise<T[]> {
+		const currentRecord = await this.findOne();
+		if (!currentRecord) return [];
+		const query = `
+			SELECT r.* FROM ${relatedModel.model.tableName} r
+			INNER JOIN ${junctionTable} j ON j.${relatedForeignKey} = r.${relatedKey}
+			WHERE j.${foreignKey} = ?
+		`;
+		const result = this.db.query<T>(query, [currentRecord[localKey]]);
+		return result.rows;
+	}
+
 	async sync(force?: boolean) {
 		if (!force) return;
 		await this.truncate();

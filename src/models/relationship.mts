@@ -11,7 +11,8 @@ export class ModelRelationshipManager {
 		modelName: string,
 		relationships: RelationshipDefinition[]
 	): void {
-		this.relationships.set(modelName, relationships);
+		const existing = this.relationships.get(modelName) ?? [];
+		this.relationships.set(modelName, [...existing, ...relationships]);
 	}
 
 	getRelationships(modelName: string): RelationshipDefinition[] {

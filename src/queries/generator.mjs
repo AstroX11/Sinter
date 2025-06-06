@@ -1,7 +1,6 @@
 import { Qunatava } from "../index.mjs";
 import { resolveDefaultForSchema } from "../schema/schema-utils.js";
 import { escapeColname } from "../utils/escape.js";
-import { parseWhere } from "../utils/whereParser.js";
 import { mapDataTypeToSQLiteType } from "./mappers.mjs";
 
 /**

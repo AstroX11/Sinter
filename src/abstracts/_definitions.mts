@@ -11,7 +11,7 @@ export function defineModel(
 		tableName:
 			modelDefinition.tableName || modelDefinition.pluralizeTablename === true
 				? `${modelDefinition.tableName}s`
-				: (modelDefinition.tableName ?? modelDefinition.name),
+				: modelDefinition.tableName ?? modelDefinition.name,
 		pluralizeTablename: modelDefinition.pluralizeTablename,
 		columns: modelDefinition.columns,
 		relationships: modelDefinition.relationships,
@@ -40,13 +40,6 @@ export function defineModel(
 	};
 
 	createTable(db, normalizedDefinition);
-
-	if (normalizedDefinition.relationships) {
-		db.associations(
-			normalizedDefinition.name,
-			normalizedDefinition.relationships
-		);
-	}
 
 	return normalizedDefinition;
 }
