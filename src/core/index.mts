@@ -5,9 +5,8 @@ import Database, {
 } from "better-sqlite3";
 
 import { ModelRelationshipManager } from "../models/relationship.mjs";
-import { defineModel } from "../abstracts/_definitions.mjs";
 import { registerSqliteFunctions } from "../internals/index.js";
-import { ModelInstance } from "../abstracts/instance.mjs";
+import { defineModel, ModelInstance } from "../abstracts/index.mjs";
 
 import type {
 	ColumnDefinition,
@@ -26,6 +25,18 @@ export class Qunatava extends Database {
 			timeout: options.timeout ?? 5000,
 			verbose: options.verbose,
 		});
+		if (options.journalMode) this.pragma(`journal_mode = ${options.journalMode}`);
+		if (options.synchronous) this.pragma(`synchronous = ${options.synchronous}`);
+		if (options.cacheSize !== undefined)
+			this.pragma(`cache_size = ${options.cacheSize}`);
+		if (options.pageSize !== undefined)
+			this.pragma(`page_size = ${options.pageSize}`);
+
+		if (options.foreignKeys !== undefined)
+			this.pragma(`foreign_keys = ${options.foreignKeys ? "ON" : "OFF"}`);
+
+		if (options.walAutoCheckpoint !== undefined)
+			this.pragma(`wal_autocheckpoint = ${options.walAutoCheckpoint}`);
 
 		registerSqliteFunctions(this);
 
@@ -87,4 +98,4 @@ export class Qunatava extends Database {
 	}
 }
 
-export default Qunatava
+export default Qunatava;
