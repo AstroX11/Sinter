@@ -217,21 +217,21 @@ export interface ColumnDefinition {
 	 * Ideal for data sanitization (e.g., trimming whitespace).
 	 * @example (value) => value.trim()
 	 */
-	set?: (value: unknown, row?: any) => unknown;
+	set?: (value: any, row?: any) => unknown;
 
 	/**
 	 * Function to validate the value before writing to the database.
 	 * Should return `true` or an error message string.
 	 * @example (email) => email.includes("@") || "Invalid email"
 	 */
-	validate?: (value: unknown) => boolean | string;
+	validate?: (value: any) => boolean | string;
 
 	/**
 	 * Transform value before insertion or update at the database level.
 	 * Can adjust formatting or apply conversions.
 	 * @example (v) => v.toLowerCase()
 	 */
-	transformIn?: (value: unknown) => unknown;
+	transformIn?: (value: any) => unknown;
 
 	/**
 	 * Transform value after reading from the database.
