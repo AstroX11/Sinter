@@ -84,6 +84,16 @@ export class Qunatava extends Database {
 		return super.exec(source);
 	}
 
+	async sync({ force }: { force: boolean }) {
+		if (!force) return;
+
+		for (const model of this.models.values()) {
+			if (!model) continue;
+			this.query(`DELETE FROM ${model.tableName}`);
+			defineModel(this, model);
+		}
+	}
+
 	/**
 	 * Creates a database backup.
 	 * @param destinationFile - Path to the backup file.
