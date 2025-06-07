@@ -40,14 +40,18 @@ async function runTest() {
 			try {
 				if (opChance < 0.25) {
 					// Create new user and simulate event
-					const created = await table.create({ username: `new_user_${Date.now()}` });
+					const created = await table.create({
+						username: `new_user_${Date.now()}`,
+					});
 					// Simulate event: created
 					// e.g., if your ORM supports event emit: table.emit("created", created);
 				} else if (opChance < 0.5) {
 					// Update user and simulate event
 					const user = await table.findOne({ where: { id: randomId } });
 					if (user) {
-						const updated = await user.update({ username: `updated_${Date.now()}` });
+						const updated = await user.update({
+							username: `updated_${Date.now()}`,
+						});
 						// Simulate event: updated
 					}
 				} else if (opChance < 0.75) {

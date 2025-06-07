@@ -195,12 +195,14 @@ for (const { col, value, type, expected } of edgeCases) {
 
 	const converted = convertValueToDataType(value, type, enumValues);
 
-	const insertEdge = db.query(`INSERT INTO datatype_tests (${col}) VALUES (?)`, [
-		converted,
-	]);
-	const selectEdge = db.query(`SELECT ${col} FROM datatype_tests WHERE id = ?`, [
-		insertEdge.lastInsertRowid,
-	]);
+	const insertEdge = db.query(
+		`INSERT INTO datatype_tests (${col}) VALUES (?)`,
+		[converted]
+	);
+	const selectEdge = db.query(
+		`SELECT ${col} FROM datatype_tests WHERE id = ?`,
+		[insertEdge.lastInsertRowid]
+	);
 	const result = selectEdge.rows[0][col];
 	const isEqual =
 		type === DataTypes.BLOB

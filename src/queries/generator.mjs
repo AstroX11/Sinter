@@ -54,7 +54,8 @@ export function* columnGenerator(columns) {
 			}
 		}
 
-		if (config.defaultExpression) def += ` DEFAULT (${config.defaultExpression})`;
+		if (config.defaultExpression)
+			def += ` DEFAULT (${config.defaultExpression})`;
 		if (config.check) def += ` CHECK (${config.check})`;
 		if (config.collate) def += ` COLLATE ${config.collate}`;
 		if (config.generatedAs || config.computedExpression) {
@@ -163,9 +164,9 @@ export function* constraintsGenerator(constraints) {
  */
 export function* triggersGenerator(triggers) {
 	for (const trigger of triggers) {
-		let sql = `CREATE TRIGGER ${escapeColname(trigger.name)} ${trigger.timing} ${
-			trigger.event
-		} ON ${escapeColname(trigger.table)}`;
+		let sql = `CREATE TRIGGER ${escapeColname(trigger.name)} ${
+			trigger.timing
+		} ${trigger.event} ON ${escapeColname(trigger.table)}`;
 		if (trigger.forEachRow) sql += " FOR EACH ROW";
 		if (trigger.when) sql += ` WHEN ${trigger.when}`;
 		sql += ` BEGIN ${trigger.statement}; END`;

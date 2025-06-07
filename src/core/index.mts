@@ -32,8 +32,10 @@ export class Qunatava extends Database {
 			verbose: options.verbose,
 		});
 		this.models = new Map();
-		if (options.journalMode) this.pragma(`journal_mode = ${options.journalMode}`);
-		if (options.synchronous) this.pragma(`synchronous = ${options.synchronous}`);
+		if (options.journalMode)
+			this.pragma(`journal_mode = ${options.journalMode}`);
+		if (options.synchronous)
+			this.pragma(`synchronous = ${options.synchronous}`);
 		if (options.cacheSize !== undefined)
 			this.pragma(`cache_size = ${options.cacheSize}`);
 		if (options.pageSize !== undefined)
@@ -140,11 +142,11 @@ export class Qunatava extends Database {
 		for (const [columnName, columnDef] of Object.entries(columns)) {
 			if (columnDef.references) {
 				const targetModelInstance = columnDef.references.table;
-				console.log(targetModelInstance)
+				console.log(targetModelInstance);
 				const targetModelName =
 					typeof targetModelInstance === "string"
 						? targetModelInstance
-						: modelName
+						: modelName;
 				const existingRelationship = relationships.find(
 					r => r.foreignKey === columnName && r.targetModel === targetModelName
 				);

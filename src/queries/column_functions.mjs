@@ -122,7 +122,9 @@ function applyValidation(column, value) {
 	if (column.validate) {
 		const result = column.validate(value);
 		if (result !== true) {
-			throw new Error(typeof result === "string" ? result : `Validation failed`);
+			throw new Error(
+				typeof result === "string" ? result : `Validation failed`
+			);
 		}
 	}
 }

@@ -52,13 +52,17 @@ export function convertValueToDataType(value, dataType, enumValues = []) {
 				? enumValues[0]
 				: null;
 		case "BLOB":
-			return value instanceof Buffer ? value : Buffer.from(JSON.stringify(value));
+			return value instanceof Buffer
+				? value
+				: Buffer.from(JSON.stringify(value));
 		case "BOOLEAN":
 			return Boolean(value) ? 1 : 0;
 		case "DATE":
 		case "DATETIME":
 			const parsedDate = new Date(String(value));
-			return Number.isFinite(parsedDate.getTime()) ? parsedDate.getTime() : null;
+			return Number.isFinite(parsedDate.getTime())
+				? parsedDate.getTime()
+				: null;
 		case "JSON":
 			return JSON.stringify(value);
 		case "ARRAY":

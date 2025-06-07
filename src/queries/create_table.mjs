@@ -73,7 +73,9 @@ export function createTable(db, modelDefinition) {
 	}
 
 	if (modelDefinition.constraints) {
-		for (const constraint of constraintsGenerator(modelDefinition.constraints)) {
+		for (const constraint of constraintsGenerator(
+			modelDefinition.constraints
+		)) {
 			sqlParts.push(constraint);
 		}
 	}

@@ -155,7 +155,9 @@ export class ModelInstance {
 		const keys = Object.keys(processedData).filter(
 			key => processedData[key] !== undefined
 		);
-		const values = Object.values(processedData).filter(val => val !== undefined);
+		const values = Object.values(processedData).filter(
+			val => val !== undefined
+		);
 		const placeholders = keys.map(() => "?").join(", ");
 		const query = `INSERT ${options.ignoreDuplicates ? "OR IGNORE" : ""} INTO ${
 			this.model.tableName
@@ -164,7 +166,9 @@ export class ModelInstance {
 		const result = this.db.query(query, values);
 
 		const pragmaQuery = `PRAGMA table_info(${this.model.tableName})`;
-		const pragmaResult = this.db.query<{ name: string; pk: number }>(pragmaQuery);
+		const pragmaResult = this.db.query<{ name: string; pk: number }>(
+			pragmaQuery
+		);
 		const pkColumn = pragmaResult.rows.find(row => row.pk === 1)?.name;
 
 		if (pkColumn && result.lastInsertRowid) {
