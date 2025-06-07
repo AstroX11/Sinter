@@ -1,11 +1,11 @@
-import { Qunatava } from "../index.mjs";
+import { Quantava } from "../index.mjs";
 import { resolveDefaultForSchema } from "../schema/schema-utils.js";
 import { escapeColname } from "../utils/escape.js";
 import { mapDataTypeToSQLiteType } from "./mappers.mjs";
 
 /**
  *
- * @param {Qunatava} db - BetterSqlite Extended Class
+ * @param {Quantava} db - BetterSqlite Extended Class
  * @param {Array<{sql:string; params:string[]}>} queries - An Array of Queries to excute
  */
 export function* queryGenerator(db, queries) {

@@ -1,9 +1,9 @@
-import { Qunatava } from "../index.mjs";
+import { Quantava } from "../index.mjs";
 import { createTable } from "../queries/create_table.mjs";
 import type { ModelDefinition } from "../types/Model.mjs";
 
 export function defineModel(
-	db: Qunatava,
+	db: Quantava,
 	modelDefinition: Partial<ModelDefinition>
 ) {
 	const normalizedDefinition: ModelDefinition = {

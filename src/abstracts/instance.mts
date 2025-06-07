@@ -1,4 +1,4 @@
-import { createTable, type Qunatava } from "../index.mjs";
+import { createTable, type Quantava } from "../index.mjs";
 import { processRow } from "../queries/column_functions.mjs";
 import type {
 	ModelDefinition,
@@ -10,10 +10,10 @@ import type {
 import { parseWhere } from "../utils/whereParser.js";
 
 export class ModelInstance {
-	private db: Qunatava;
+	private db: Quantava;
 	private model: ModelDefinition;
 
-	constructor(db: Qunatava, model: ModelDefinition) {
+	constructor(db: Quantava, model: ModelDefinition) {
 		this.db = db;
 		this.model = model;
 	}

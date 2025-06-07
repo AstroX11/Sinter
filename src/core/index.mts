@@ -17,7 +17,7 @@ import type {
 /**
  * SQLite database wrapper with ORM capabilities.
  */
-export class Qunatava extends Database {
+export class Quantava extends Database {
 	private _relationshipManager: ModelRelationshipManager;
 	private models: Map<string, ModelDefinition>;
 
@@ -187,4 +187,4 @@ export class Qunatava extends Database {
 		return new ModelInstance(this, modelDefinition);
 	}
 }
-export default Qunatava;
+export default Quantava;
