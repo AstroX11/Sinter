@@ -65,14 +65,31 @@ export function processColumnValue(
 
 /**
  * Resolves the default value for a column.
+ * If the value is an object/array, it's JSON.stringified.
+ * If it's a boolean, it's converted to 1 or 0.
+ * If it's a Buffer, it's converted to a Blob.
  * @param {import("../index.mjs").ColumnDefinition} column - The column definition.
- * @returns {any} - The default value.
+ * @returns {any} - The resolved default value.
  */
 function resolveDefault(column) {
-	if (column.defaultFn) {
-		return column.defaultFn();
+	let value = column.defaultFn ? column.defaultFn() : column.defaultValue;
+
+	if (typeof value === "object" && value !== null) {
+		// Buffer handling
+		if (Buffer.isBuffer(value)) {
+			// Convert Buffer to Uint8Array for Blob compatibility
+			return new Blob([new Uint8Array(value)]);
+		}
+		// JSON handling for objects and arrays
+		return JSON.stringify(value);
 	}
-	return column.defaultValue;
+
+	// Boolean handling
+	if (typeof value === "boolean") {
+		return value ? 1 : 0;
+	}
+
+	return value;
 }
 
 /**
