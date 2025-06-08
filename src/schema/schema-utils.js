@@ -1,12 +1,23 @@
 export function resolveDefaultForSchema(column) {
-	// If defaultValue is a function, don't execute it at schema time (runtime only)
+	// If defaultValue is a function, skip evaluation at schema time
 	if (typeof column.defaultValue === "function") {
-		// Ignore or leave out default from schema
 		return undefined;
 	}
-	if (column.defaultValue !== undefined) {
-		return column.defaultValue;
+
+	let value = column.defaultValue;
+
+	if (typeof value === "object" && value !== null) {
+		if (Buffer.isBuffer(value)) {
+			// Convert Buffer to Uint8Array for Blob compatibility
+			return new Blob([new Uint8Array(value)]);
+		}
+		// JSON stringify for objects/arrays
+		return JSON.stringify(value);
 	}
-	// no default or defaultFn - nothing to add at schema time
-	return undefined;
+
+	if (typeof value === "boolean") {
+		return value ? 1 : 0;
+	}
+
+	return value !== undefined ? value : undefined;
 }
